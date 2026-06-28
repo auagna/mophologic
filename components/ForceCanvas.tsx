@@ -79,9 +79,9 @@ export function ForceCanvas() {
   };
 
   const onDoubleClick = (event: MouseEvent<SVGSVGElement>) => {
-    if ((event.target as Element).closest("[data-bubble-id]")) return;
     const point = pointFromEvent(event);
     if (!point) return;
+    event.preventDefault();
     addBubble(event.altKey ? "carve" : "mass", point.x, point.y);
   };
 
