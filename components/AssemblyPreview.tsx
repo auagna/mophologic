@@ -2,9 +2,9 @@
 
 import { useMemo } from "react";
 import { buildBubbleShape } from "@/lib/generateBubbleShape";
-import { VIEWBOX } from "@/lib/geometry";
+import { toSvgPoint, VIEWBOX } from "@/lib/geometry";
 import { presets, useFormLabStore } from "@/store/useFormLabStore";
-import type { PresetName } from "@/types/formLab";
+import type { Bubble, PresetName } from "@/types/formLab";
 import { Button } from "./ui/Button";
 
 type ModulePlacement = {
@@ -42,7 +42,15 @@ export function AssemblyPreview() {
         </div>
         <div className="grid gap-2">
           {arrangements.map((arrangement) => (
-            <PreviewItem key={arrangement.title} title={arrangement.title} path={bubbleShape.shapePath} guidePath={bubbleShape.boundaryPath} modules={arrangement.modules} scale={arrangement.scale} />
+            <PreviewItem
+              key={arrangement.title}
+              title={arrangement.title}
+              guidePath={bubbleShape.boundaryPath}
+              massBubbles={bubbleShape.massBubbles}
+              carveBubbles={bubbleShape.carveBubbles}
+              modules={arrangement.modules}
+              scale={arrangement.scale}
+            />
           ))}
         </div>
       </section>
@@ -63,17 +71,20 @@ export function AssemblyPreview() {
 
 function PreviewItem({
   title,
-  path,
   guidePath,
+  massBubbles,
+  carveBubbles,
   modules,
   scale
 }: {
   title: string;
-  path: string;
   guidePath: string;
+  massBubbles: Bubble[];
+  carveBubbles: Bubble[];
   modules: ModulePlacement[];
   scale: number;
 }) {
+  const safeId = title.replace(/[^a-zA-Z0-9]/g, "-");
   return (
     <article className="border border-lab-border bg-[#0b0d10]">
       <div className="flex items-center justify-between border-b border-lab-border px-2 py-1.5">
@@ -81,12 +92,30 @@ function PreviewItem({
         <span className="text-[10px] leading-none text-lab-muted">{modules.length} mod</span>
       </div>
       <svg viewBox="0 0 300 170" className="block h-[122px] w-full bg-[#12100d]">
+        <defs>
+          <clipPath id={`preview-boundary-${safeId}`}>
+            <path d={guidePath} />
+          </clipPath>
+          <filter id={`preview-metaball-${safeId}`} x="-20%" y="-20%" width="140%" height="140%" colorInterpolationFilters="sRGB">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="14" result="blur" />
+            <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -10" result="threshold" />
+          </filter>
+        </defs>
         <rect width="300" height="170" fill="#16130f" />
         <path d="M 24 86 H 276 M 150 18 V 152" stroke="#f2efe5" strokeWidth="0.7" opacity="0.15" />
         {modules.map((module, index) => (
           <g key={index} transform={`translate(${module.x} ${module.y}) rotate(${module.rotate ?? 0}) scale(${scale}) translate(${-VIEWBOX.cx} ${-VIEWBOX.cy})`}>
             <path d={guidePath} fill="none" stroke="#f2efe5" strokeDasharray="8 10" strokeWidth="7" opacity="0.25" />
-            <path d={path} fill="#050505" stroke="#f2efe5" strokeWidth="4" />
+            <g clipPath={`url(#preview-boundary-${safeId})`} filter={`url(#preview-metaball-${safeId})`}>
+              {massBubbles.map((bubble) => {
+                const point = toSvgPoint(bubble);
+                return <circle key={bubble.id} cx={point.x} cy={point.y} r={bubble.r * Math.min(VIEWBOX.width, VIEWBOX.height)} fill="#050505" />;
+              })}
+            </g>
+            {carveBubbles.map((bubble) => {
+              const point = toSvgPoint(bubble);
+              return <circle key={bubble.id} cx={point.x} cy={point.y} r={bubble.r * Math.min(VIEWBOX.width, VIEWBOX.height)} fill="#16130f" stroke="#f2efe5" strokeWidth="2" opacity="0.88" />;
+            })}
           </g>
         ))}
       </svg>

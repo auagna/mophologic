@@ -9,7 +9,7 @@ import type { Bubble } from "@/types/formLab";
 
 type DragTarget = {
   id: string;
-  kind: Bubble["kind"];
+  type: Bubble["type"];
 } | null;
 
 export function FormCanvas() {
@@ -34,7 +34,7 @@ export function FormCanvas() {
     if (!dragTarget) return;
     const point = pointFromEvent(event);
     if (!point) return;
-    if (dragTarget.kind === "carve") {
+    if (dragTarget.type === "carve") {
       state.updateCarveBubble(dragTarget.id, point.x, point.y);
     } else {
       state.updateBubble(dragTarget.id, point.x, point.y);
@@ -64,12 +64,26 @@ export function FormCanvas() {
           onPointerLeave={() => setDragTarget(null)}
         >
           <defs>
-            <clipPath id="form-lab-clip">
-              <path d={bubbleShape.shapePath} />
+            <clipPath id="form-lab-boundary-clip">
+              <path d={bubbleShape.boundaryPath} />
             </clipPath>
-            <mask id="form-lab-carve-mask" maskUnits="userSpaceOnUse" x="0" y="0" width={VIEWBOX.width} height={VIEWBOX.height}>
+            <filter id="form-lab-metaball" x="-20%" y="-20%" width="140%" height="140%" colorInterpolationFilters="sRGB">
+              <feGaussianBlur in="SourceGraphic" stdDeviation={Math.max(7, 8 + state.mergeDistance * 0.16)} result="blur" />
+              <feColorMatrix
+                in="blur"
+                mode="matrix"
+                values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -10"
+                result="threshold"
+              />
+            </filter>
+            <mask id="form-lab-mass-mask" maskUnits="userSpaceOnUse" x="0" y="0" width={VIEWBOX.width} height={VIEWBOX.height}>
               <rect width={VIEWBOX.width} height={VIEWBOX.height} fill="black" />
-              <path d={bubbleShape.shapePath} fill="white" />
+              <g clipPath="url(#form-lab-boundary-clip)" filter="url(#form-lab-metaball)">
+                {bubbleShape.massBubbles.map((bubble) => {
+                  const point = toSvgPoint(bubble);
+                  return <circle key={bubble.id} cx={point.x} cy={point.y} r={bubble.r * Math.min(VIEWBOX.width, VIEWBOX.height)} fill="white" />;
+                })}
+              </g>
               {bubbleShape.carveBubbles.map((bubble) => {
                 const point = toSvgPoint(bubble);
                 return <circle key={bubble.id} cx={point.x} cy={point.y} r={bubble.r * Math.min(VIEWBOX.width, VIEWBOX.height)} fill="black" />;
@@ -86,7 +100,7 @@ export function FormCanvas() {
 
           {state.showBubbles ? (
             <g opacity="0.85">
-              {bubbleShape.matterBubbles.map((bubble) => {
+              {bubbleShape.massBubbles.map((bubble) => {
                 const point = toSvgPoint(bubble);
                 return (
                   <circle
@@ -101,7 +115,7 @@ export function FormCanvas() {
                     className="cursor-grab active:cursor-grabbing"
                     onPointerDown={(event) => {
                       event.stopPropagation();
-                      setDragTarget({ id: bubble.id, kind: "matter" });
+                      setDragTarget({ id: bubble.id, type: "mass" });
                       event.currentTarget.setPointerCapture(event.pointerId);
                     }}
                   />
@@ -121,7 +135,7 @@ export function FormCanvas() {
                     className="cursor-grab active:cursor-grabbing"
                     onPointerDown={(event) => {
                       event.stopPropagation();
-                      setDragTarget({ id: bubble.id, kind: "carve" });
+                      setDragTarget({ id: bubble.id, type: "carve" });
                       event.currentTarget.setPointerCapture(event.pointerId);
                     }}
                   />
@@ -130,10 +144,10 @@ export function FormCanvas() {
             </g>
           ) : null}
 
-          <g mask="url(#form-lab-carve-mask)">
-            <path d={bubbleShape.shapePath} fill={state.mode === "graphic" ? "#050505" : "#070707"} stroke="#050505" strokeWidth="2.5" />
+          <g mask="url(#form-lab-mass-mask)">
+            <rect width={VIEWBOX.width} height={VIEWBOX.height} fill={state.mode === "graphic" ? "#050505" : "#070707"} />
             {state.showPattern ? (
-              <g clipPath="url(#form-lab-clip)" opacity={state.mode === "table" ? 0.7 : 0.95}>
+              <g opacity={state.mode === "table" ? 0.7 : 0.95}>
                 {pattern.map((element, index) =>
                   element.kind === "line" ? (
                     <path key={index} d={element.d} fill="none" stroke="#f5f2e9" strokeWidth={element.strokeWidth ?? state.patternStrokeWidth} strokeLinecap="round" strokeLinejoin="round" opacity="0.88" />

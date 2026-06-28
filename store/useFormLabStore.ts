@@ -245,7 +245,7 @@ export const useFormLabStore = create<FormLabStore>()(
     }),
     {
       name: "form-lab-state",
-      version: 2,
+      version: 3,
       migrate: (persisted) => {
         const state = persisted as Partial<FormLabSnapshot>;
         return withGeneratedBubbles(syncDimensions({ ...defaultSnapshot, ...state }));

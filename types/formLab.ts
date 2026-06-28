@@ -26,8 +26,16 @@ export type Bubble = {
   x: number;
   y: number;
   r: number;
-  kind: "matter" | "carve";
+  type: "mass" | "carve";
   stuck?: boolean;
+  locked?: boolean;
+};
+
+export type Boundary = {
+  shape: "rectangle" | "square" | "circle" | "ellipse" | "capsule" | "roundedRect";
+  width: number;
+  height: number;
+  padding: number;
 };
 
 export type NumericParam =

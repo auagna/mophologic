@@ -1,62 +1,51 @@
-import type { FormLabSnapshot } from "@/types/formLab";
+import type { Bubble, FormLabSnapshot } from "@/types/formLab";
 import { VIEWBOX } from "./geometry";
-import { randomRange, seededRandom } from "./random";
 
 export type PatternElement =
   | { kind: "line"; d: string; strokeWidth?: number }
   | { kind: "circle"; cx: number; cy: number; r: number; strokeWidth?: number; fill?: string };
 
-export function generatePattern(snapshot: Pick<FormLabSnapshot, "seed" | "patternType" | "patternDensity" | "patternScale" | "patternStrokeWidth">): PatternElement[] {
-  const rand = seededRandom(snapshot.seed + 9001);
-  const density = Math.max(4, Math.round(snapshot.patternDensity / 5));
-  const scale = 0.5 + snapshot.patternScale / 80;
+type PatternSnapshot = Pick<FormLabSnapshot, "patternType" | "patternDensity" | "patternScale" | "patternStrokeWidth" | "bubbles">;
+
+type SvgBubble = {
+  id: string;
+  x: number;
+  y: number;
+  r: number;
+};
+
+export function generatePattern(snapshot: PatternSnapshot): PatternElement[] {
+  const bubbles = snapshot.bubbles.map(toSvgBubble);
+  if (!bubbles.length) return [];
+
+  const density = Math.max(0.18, snapshot.patternDensity / 100);
+  const scale = 0.55 + snapshot.patternScale / 90;
+  const pairs = nearbyPairs(bubbles, Math.round(12 + density * 58));
   const elements: PatternElement[] = [];
 
   if (snapshot.patternType === "dots") {
-    for (let i = 0; i < density * 5; i += 1) {
+    for (const bubble of sampleBubbles(bubbles, density)) {
       elements.push({
         kind: "circle",
-        cx: randomRange(rand, 165, VIEWBOX.width - 165),
-        cy: randomRange(rand, 105, VIEWBOX.height - 105),
-        r: randomRange(rand, 2.2, 9) * scale,
-        fill: "rgba(255,255,255,0.88)"
+        cx: bubble.x,
+        cy: bubble.y,
+        r: Math.max(2.5, bubble.r * 0.22 * scale),
+        fill: "rgba(255,255,255,0.9)"
       });
     }
     return elements;
   }
 
   if (snapshot.patternType === "flow") {
-    for (let i = 0; i < density; i += 1) {
-      const y = 110 + i * (460 / density);
-      const amp = randomRange(rand, 15, 44) * scale;
-      elements.push({
-        kind: "line",
-        d: `M 130 ${y.toFixed(1)} C 280 ${(y - amp).toFixed(1)} 360 ${(y + amp).toFixed(1)} 500 ${y.toFixed(1)} S 760 ${(y - amp).toFixed(1)} 880 ${y.toFixed(1)}`
-      });
-    }
-    return elements;
-  }
-
-  if (snapshot.patternType === "branch" || snapshot.patternType === "vein") {
-    const trunks = snapshot.patternType === "branch" ? 4 : 7;
-    for (let t = 0; t < trunks; t += 1) {
-      const x = randomRange(rand, 220, 780);
-      const y = randomRange(rand, 155, 525);
-      const len = randomRange(rand, 85, 180) * scale;
-      const angle = randomRange(rand, -Math.PI, Math.PI);
-      const x2 = x + Math.cos(angle) * len;
-      const y2 = y + Math.sin(angle) * len;
-      elements.push({ kind: "line", d: `M ${x.toFixed(1)} ${y.toFixed(1)} L ${x2.toFixed(1)} ${y2.toFixed(1)}` });
-      const branches = snapshot.patternType === "branch" ? 3 : 5;
-      for (let b = 0; b < branches; b += 1) {
-        const p = (b + 1) / (branches + 1);
-        const bx = x + (x2 - x) * p;
-        const by = y + (y2 - y) * p;
-        const ba = angle + randomRange(rand, -1.1, 1.1);
-        const bl = len * randomRange(rand, 0.18, 0.38);
+    for (const bubble of sampleBubbles(bubbles, density * 0.8)) {
+      for (let ring = 1; ring <= 2; ring += 1) {
         elements.push({
-          kind: "line",
-          d: `M ${bx.toFixed(1)} ${by.toFixed(1)} Q ${(bx + Math.cos(ba) * bl * 0.5).toFixed(1)} ${(by + Math.sin(ba) * bl * 0.5).toFixed(1)} ${(bx + Math.cos(ba) * bl).toFixed(1)} ${(by + Math.sin(ba) * bl).toFixed(1)}`
+          kind: "circle",
+          cx: bubble.x,
+          cy: bubble.y,
+          r: Math.max(5, bubble.r * (0.62 + ring * 0.28) * scale),
+          fill: "none",
+          strokeWidth: Math.max(0.7, snapshot.patternStrokeWidth * 0.62)
         });
       }
     }
@@ -64,30 +53,104 @@ export function generatePattern(snapshot: Pick<FormLabSnapshot, "seed" | "patter
   }
 
   if (snapshot.patternType === "tangent") {
-    const circles = Array.from({ length: density + 5 }, () => ({
-      cx: randomRange(rand, 185, 815),
-      cy: randomRange(rand, 120, 560),
-      r: randomRange(rand, 9, 28) * scale
-    }));
-    circles.forEach((circle, index) => {
-      elements.push({ kind: "circle", ...circle, fill: "none" });
-      const next = circles[index + 1];
-      if (next) {
-        elements.push({ kind: "line", d: `M ${circle.cx.toFixed(1)} ${circle.cy.toFixed(1)} L ${next.cx.toFixed(1)} ${next.cy.toFixed(1)}` });
-      }
-    });
+    for (const bubble of sampleBubbles(bubbles, density)) {
+      elements.push({
+        kind: "circle",
+        cx: bubble.x,
+        cy: bubble.y,
+        r: Math.max(5, bubble.r * 0.48 * scale),
+        fill: "none",
+        strokeWidth: Math.max(0.8, snapshot.patternStrokeWidth * 0.7)
+      });
+    }
+    for (const [a, b] of pairs) {
+      const tangent = tangentLine(a, b);
+      elements.push({ kind: "line", d: `M ${tangent.x1} ${tangent.y1} L ${tangent.x2} ${tangent.y2}` });
+    }
     return elements;
   }
 
-  for (let i = 0; i < density * 2; i += 1) {
-    const x = randomRange(rand, 140, 860);
-    const y = randomRange(rand, 105, 575);
-    const s = randomRange(rand, 32, 82) * scale;
+  if (snapshot.patternType === "vein" || snapshot.patternType === "branch") {
+    const degreeLimit = snapshot.patternType === "branch" ? 2 : 3;
+    const degrees = new Map<string, number>();
+    for (const [a, b] of pairs) {
+      const da = degrees.get(a.id) ?? 0;
+      const db = degrees.get(b.id) ?? 0;
+      if (da >= degreeLimit || db >= degreeLimit) continue;
+      degrees.set(a.id, da + 1);
+      degrees.set(b.id, db + 1);
+      const mx = (a.x + b.x) / 2;
+      const my = (a.y + b.y) / 2;
+      const bend = snapshot.patternType === "branch" ? 0.12 : 0.06;
+      elements.push({
+        kind: "line",
+        d: `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${(mx + (b.y - a.y) * bend).toFixed(1)} ${(my - (b.x - a.x) * bend).toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`,
+        strokeWidth: snapshot.patternType === "branch" ? snapshot.patternStrokeWidth * 0.9 : undefined
+      });
+    }
+    return elements;
+  }
+
+  for (const [a, b] of pairs) {
+    const midX = (a.x + b.x) / 2;
+    const midY = (a.y + b.y) / 2;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.max(1, Math.hypot(dx, dy));
+    const nx = -dy / len;
+    const ny = dx / len;
+    const span = Math.min(76, len * 0.48) * scale;
     elements.push({
       kind: "line",
-      d: `M ${x.toFixed(1)} ${(y - s).toFixed(1)} L ${(x + s * 0.84).toFixed(1)} ${(y - s * 0.25).toFixed(1)} L ${(x + s * 0.5).toFixed(1)} ${(y + s * 0.72).toFixed(1)} L ${(x - s * 0.5).toFixed(1)} ${(y + s * 0.72).toFixed(1)} L ${(x - s * 0.84).toFixed(1)} ${(y - s * 0.25).toFixed(1)} Z`
+      d: `M ${(midX - nx * span).toFixed(1)} ${(midY - ny * span).toFixed(1)} L ${(midX + nx * span).toFixed(1)} ${(midY + ny * span).toFixed(1)}`,
+      strokeWidth: Math.max(0.7, snapshot.patternStrokeWidth * 0.72)
     });
   }
 
   return elements;
+}
+
+function toSvgBubble(bubble: Bubble): SvgBubble {
+  return {
+    id: bubble.id,
+    x: bubble.x * VIEWBOX.width,
+    y: bubble.y * VIEWBOX.height,
+    r: bubble.r * Math.min(VIEWBOX.width, VIEWBOX.height)
+  };
+}
+
+function sampleBubbles(bubbles: SvgBubble[], density: number) {
+  const take = Math.max(3, Math.round(bubbles.length * Math.min(1, density)));
+  return bubbles.slice(0, take);
+}
+
+function nearbyPairs(bubbles: SvgBubble[], maxPairs: number): Array<[SvgBubble, SvgBubble]> {
+  const pairs: Array<[SvgBubble, SvgBubble, number]> = [];
+  for (let i = 0; i < bubbles.length; i += 1) {
+    const a = bubbles[i];
+    if (!a) continue;
+    for (let j = i + 1; j < bubbles.length; j += 1) {
+      const b = bubbles[j];
+      if (!b) continue;
+      const distance = Math.hypot(a.x - b.x, a.y - b.y);
+      const reach = a.r + b.r + 125;
+      if (distance <= reach) pairs.push([a, b, distance]);
+    }
+  }
+  pairs.sort((a, b) => a[2] - b[2]);
+  return pairs.slice(0, maxPairs).map(([a, b]) => [a, b]);
+}
+
+function tangentLine(a: SvgBubble, b: SvgBubble) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const length = Math.max(1, Math.hypot(dx, dy));
+  const ux = dx / length;
+  const uy = dy / length;
+  return {
+    x1: (a.x + ux * a.r * 0.45).toFixed(1),
+    y1: (a.y + uy * a.r * 0.45).toFixed(1),
+    x2: (b.x - ux * b.r * 0.45).toFixed(1),
+    y2: (b.y - uy * b.r * 0.45).toFixed(1)
+  };
 }
