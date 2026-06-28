@@ -1,4 +1,4 @@
-import type { BoundaryShape, ControlPoint } from "@/types/formLab";
+import type { BoundaryShape, Bubble } from "@/types/formLab";
 import { clamp } from "./random";
 
 export type Point = { x: number; y: number };
@@ -144,6 +144,6 @@ export function smoothClosedPath(points: Point[], roundness: number) {
   return commands.join(" ");
 }
 
-export function normalizeControlPoints(points: ControlPoint[]): Point[] {
+export function normalizeControlPoints(points: Bubble[]): Point[] {
   return points.map((point) => ({ x: point.x, y: point.y }));
 }

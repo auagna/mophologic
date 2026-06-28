@@ -2,13 +2,13 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { generateBoundaryPoints } from "@/lib/generateShape";
+import { clampBubbleToBoundary, generateBubbles } from "@/lib/generateBubbleShape";
 import type {
   BooleanParam,
   BoundaryShape,
+  Bubble,
   ConnectionPointCount,
   ConnectionPointType,
-  ControlPoint,
   FormLabSnapshot,
   FormMode,
   NumericParam,
@@ -24,11 +24,9 @@ type FormLabActions = {
   updateParam: (key: NumericParam | BooleanParam, value: number | boolean) => void;
   randomizeSeed: () => void;
   resetForm: () => void;
-  regenerateControlPoints: () => void;
-  updateControlPoint: (id: string, x: number, y: number) => void;
-  addControlPoint: (x: number, y: number) => void;
-  deleteControlPoint: (id: string) => void;
-  toggleLockPoint: (id: string) => void;
+  regenerateBubbles: () => void;
+  updateBubble: (id: string, x: number, y: number) => void;
+  updateCarveBubble: (id: string, x: number, y: number) => void;
   setTangentRule: (rule: TangentRule) => void;
   setSymmetry: (symmetry: Symmetry) => void;
   setConnectionPointCount: (count: ConnectionPointCount) => void;
@@ -41,16 +39,23 @@ export type FormLabStore = FormLabSnapshot & FormLabActions;
 
 const defaultSnapshot: FormLabSnapshot = {
   mode: "table",
-  boundaryShape: "roundedRect",
+  boundaryShape: "circle",
   widthMm: 700,
   depthMm: 700,
+  padding: 34,
   seed: 2417,
-  density: 58,
-  roundness: 78,
-  connection: 54,
-  organicNoise: 48,
-  concaveAmount: -34,
-  neckWidth: 42,
+  bubbleCount: 34,
+  minRadius: 34,
+  maxRadius: 94,
+  sizeVariation: 62,
+  attraction: 66,
+  repulsion: 48,
+  mergeDistance: 42,
+  boundaryStick: 52,
+  carveBubbleCount: 7,
+  carveRadius: 58,
+  carveDepth: 64,
+  edgeCarveOnly: true,
   symmetry: "none",
   tangentRule: "blob",
   cornerRule: "random",
@@ -62,48 +67,91 @@ const defaultSnapshot: FormLabSnapshot = {
   patternStrokeWidth: 2.4,
   showGrid: true,
   showBoundary: true,
-  showControlPoints: true,
+  showBubbles: true,
   showPattern: true,
-  controlPoints: []
+  bubbles: [],
+  carveBubbles: []
 };
 
-function withGeneratedPoints(snapshot: FormLabSnapshot): FormLabSnapshot {
+function withGeneratedBubbles(snapshot: FormLabSnapshot): FormLabSnapshot {
+  const generated = generateBubbles(snapshot);
   return {
     ...snapshot,
-    controlPoints: generateBoundaryPoints(snapshot)
+    bubbles: generated.bubbles,
+    carveBubbles: generated.carveBubbles
   };
+}
+
+function shouldRegenerateForParam(key: NumericParam | BooleanParam) {
+  return [
+    "padding",
+    "seed",
+    "bubbleCount",
+    "minRadius",
+    "maxRadius",
+    "sizeVariation",
+    "attraction",
+    "repulsion",
+    "mergeDistance",
+    "boundaryStick",
+    "carveBubbleCount",
+    "carveRadius",
+    "carveDepth",
+    "edgeCarveOnly"
+  ].includes(key);
+}
+
+function syncDimensions(snapshot: FormLabSnapshot): FormLabSnapshot {
+  if (snapshot.boundaryShape === "circle" || snapshot.boundaryShape === "square") {
+    const size = Math.max(snapshot.widthMm, snapshot.depthMm);
+    return { ...snapshot, widthMm: size, depthMm: size };
+  }
+  return snapshot;
 }
 
 export const presets: Record<PresetName, Partial<FormLabSnapshot>> = {
   "Tangent Black": {
     mode: "graphic",
-    tangentRule: "circle",
     boundaryShape: "ellipse",
-    concaveAmount: 16,
-    density: 68,
-    roundness: 82,
-    organicNoise: 25,
-    patternType: "tangent",
-    patternDensity: 64
+    bubbleCount: 26,
+    minRadius: 44,
+    maxRadius: 120,
+    attraction: 84,
+    repulsion: 30,
+    mergeDistance: 64,
+    boundaryStick: 30,
+    carveBubbleCount: 0,
+    patternType: "tangent"
   },
   "Soft Blob": {
     mode: "graphic",
-    tangentRule: "blob",
     boundaryShape: "freeform",
-    concaveAmount: 28,
-    density: 48,
-    roundness: 94,
-    organicNoise: 62,
+    bubbleCount: 42,
+    minRadius: 30,
+    maxRadius: 86,
+    sizeVariation: 80,
+    attraction: 72,
+    repulsion: 34,
+    mergeDistance: 58,
+    carveBubbleCount: 3,
+    carveRadius: 44,
+    edgeCarveOnly: false,
     patternType: "flow"
   },
   "Concave Table": {
     mode: "table",
-    boundaryShape: "roundedRect",
-    concaveAmount: -58,
-    density: 56,
-    roundness: 86,
-    organicNoise: 32,
-    tangentRule: "flat",
+    boundaryShape: "circle",
+    bubbleCount: 32,
+    minRadius: 40,
+    maxRadius: 98,
+    attraction: 64,
+    repulsion: 56,
+    mergeDistance: 42,
+    boundaryStick: 74,
+    carveBubbleCount: 10,
+    carveRadius: 66,
+    carveDepth: 82,
+    edgeCarveOnly: true,
     patternType: "vein"
   },
   "Cellular Pattern": {
@@ -113,85 +161,72 @@ export const presets: Record<PresetName, Partial<FormLabSnapshot>> = {
     patternScale: 56,
     patternStrokeWidth: 2,
     showPattern: true,
-    concaveAmount: -22
+    bubbleCount: 48,
+    mergeDistance: 36,
+    carveBubbleCount: 6
   },
   "Stem Network": {
     mode: "pattern",
-    tangentRule: "stem",
-    patternType: "branch",
-    patternDensity: 70,
-    organicNoise: 74,
-    neckWidth: 18,
-    concaveAmount: -18
+    boundaryShape: "capsule",
+    bubbleCount: 44,
+    minRadius: 22,
+    maxRadius: 70,
+    attraction: 88,
+    repulsion: 24,
+    mergeDistance: 72,
+    boundaryStick: 42,
+    patternType: "branch"
   },
   "Big Table Study": {
     mode: "table",
     boundaryShape: "capsule",
     widthMm: 900,
     depthMm: 620,
+    bubbleCount: 54,
+    minRadius: 34,
+    maxRadius: 82,
+    attraction: 58,
+    repulsion: 62,
+    mergeDistance: 34,
+    boundaryStick: 84,
+    carveBubbleCount: 8,
+    carveRadius: 52,
     connectionPointCount: 8,
-    connectionPointType: "universal",
-    connection: 78,
-    concaveAmount: -26,
-    tangentRule: "capsule"
+    connectionPointType: "universal"
   }
 };
 
 export const useFormLabStore = create<FormLabStore>()(
   persist(
-    (set, get) => ({
-      ...withGeneratedPoints(defaultSnapshot),
+    (set) => ({
+      ...withGeneratedBubbles(defaultSnapshot),
       setMode: (mode) => set({ mode }),
       setBoundaryShape: (boundaryShape) =>
         set((state) => {
-          const size = boundaryShape === "circle" || boundaryShape === "square" ? Math.max(state.widthMm, state.depthMm) : state.widthMm;
-          const next = {
-            ...state,
-            boundaryShape,
-            widthMm: size,
-            depthMm: boundaryShape === "circle" || boundaryShape === "square" ? size : state.depthMm
-          };
-          return { ...next, controlPoints: generateBoundaryPoints(next) };
+          const next = syncDimensions({ ...state, boundaryShape });
+          return withGeneratedBubbles(next);
         }),
       updateParam: (key, value) =>
         set((state) => {
-          const next = { ...state, [key]: value };
-          if ((key === "widthMm" || key === "depthMm") && (state.boundaryShape === "circle" || state.boundaryShape === "square")) {
-            next.widthMm = Number(value);
-            next.depthMm = Number(value);
-          }
+          const next = syncDimensions({ ...state, [key]: value });
+          if (shouldRegenerateForParam(key)) return withGeneratedBubbles(next);
           return next;
         }),
       randomizeSeed: () =>
-        set((state) => {
-          const next = { ...state, seed: Math.floor(1000 + Math.random() * 900000) };
-          return { seed: next.seed, controlPoints: generateBoundaryPoints(next) };
-        }),
-      resetForm: () => set(withGeneratedPoints(defaultSnapshot)),
-      regenerateControlPoints: () => set((state) => ({ controlPoints: generateBoundaryPoints(state) })),
-      updateControlPoint: (id, x, y) =>
+        set((state) => withGeneratedBubbles({ ...state, seed: Math.floor(1000 + Math.random() * 900000) })),
+      resetForm: () => set(withGeneratedBubbles(defaultSnapshot)),
+      regenerateBubbles: () => set((state) => withGeneratedBubbles(state)),
+      updateBubble: (id, x, y) =>
         set((state) => ({
-          controlPoints: state.controlPoints.map((point) => (point.id === id && !point.locked ? { ...point, x, y } : point))
+          bubbles: state.bubbles.map((bubble) =>
+            bubble.id === id ? clampBubbleToBoundary({ ...bubble, x, y }, state.boundaryShape, state.padding / 1000) : bubble
+          )
         })),
-      addControlPoint: (x, y) =>
+      updateCarveBubble: (id, x, y) =>
         set((state) => ({
-          controlPoints: [
-            ...state.controlPoints,
-            {
-              id: `p-user-${Date.now()}`,
-              x,
-              y,
-              locked: false
-            }
-          ].sort((a, b) => Math.atan2(a.y - 0.5, a.x - 0.5) - Math.atan2(b.y - 0.5, b.x - 0.5))
-        })),
-      deleteControlPoint: (id) =>
-        set((state) => ({
-          controlPoints: state.controlPoints.length <= 4 ? state.controlPoints : state.controlPoints.filter((point) => point.id !== id)
-        })),
-      toggleLockPoint: (id) =>
-        set((state) => ({
-          controlPoints: state.controlPoints.map((point) => (point.id === id ? { ...point, locked: !point.locked } : point))
+          carveBubbles: state.carveBubbles.map((bubble) =>
+            bubble.id === id ? clampBubbleToBoundary({ ...bubble, x, y }, state.boundaryShape, state.padding / 1000) : bubble
+          )
         })),
       setTangentRule: (tangentRule) => set({ tangentRule }),
       setSymmetry: (symmetry) => set({ symmetry }),
@@ -200,21 +235,21 @@ export const useFormLabStore = create<FormLabStore>()(
       setPatternType: (patternType) => set({ patternType }),
       applyPreset: (name) =>
         set((state) => {
-          const next = {
+          const next = syncDimensions({
             ...state,
             ...presets[name],
             seed: state.seed + 137
-          };
-          if (next.boundaryShape === "circle" || next.boundaryShape === "square") {
-            const size = Math.max(next.widthMm, next.depthMm);
-            next.widthMm = size;
-            next.depthMm = size;
-          }
-          return { ...next, controlPoints: generateBoundaryPoints(next) };
+          });
+          return withGeneratedBubbles(next);
         })
     }),
     {
       name: "form-lab-state",
+      version: 2,
+      migrate: (persisted) => {
+        const state = persisted as Partial<FormLabSnapshot>;
+        return withGeneratedBubbles(syncDimensions({ ...defaultSnapshot, ...state }));
+      },
       partialize: (state) => {
         const {
           setMode,
@@ -222,11 +257,9 @@ export const useFormLabStore = create<FormLabStore>()(
           updateParam,
           randomizeSeed,
           resetForm,
-          regenerateControlPoints,
-          updateControlPoint,
-          addControlPoint,
-          deleteControlPoint,
-          toggleLockPoint,
+          regenerateBubbles,
+          updateBubble,
+          updateCarveBubble,
           setTangentRule,
           setSymmetry,
           setConnectionPointCount,
@@ -240,11 +273,9 @@ export const useFormLabStore = create<FormLabStore>()(
         void updateParam;
         void randomizeSeed;
         void resetForm;
-        void regenerateControlPoints;
-        void updateControlPoint;
-        void addControlPoint;
-        void deleteControlPoint;
-        void toggleLockPoint;
+        void regenerateBubbles;
+        void updateBubble;
+        void updateCarveBubble;
         void setTangentRule;
         void setSymmetry;
         void setConnectionPointCount;
@@ -252,39 +283,7 @@ export const useFormLabStore = create<FormLabStore>()(
         void setPatternType;
         void applyPreset;
         return snapshot;
-      },
-      version: 1
+      }
     }
   )
 );
-
-export function currentSnapshot(): FormLabSnapshot {
-  const state = useFormLabStore.getState();
-  return {
-    mode: state.mode,
-    boundaryShape: state.boundaryShape,
-    widthMm: state.widthMm,
-    depthMm: state.depthMm,
-    seed: state.seed,
-    density: state.density,
-    roundness: state.roundness,
-    connection: state.connection,
-    organicNoise: state.organicNoise,
-    concaveAmount: state.concaveAmount,
-    neckWidth: state.neckWidth,
-    symmetry: state.symmetry,
-    tangentRule: state.tangentRule,
-    cornerRule: state.cornerRule,
-    connectionPointCount: state.connectionPointCount,
-    connectionPointType: state.connectionPointType,
-    patternType: state.patternType,
-    patternDensity: state.patternDensity,
-    patternScale: state.patternScale,
-    patternStrokeWidth: state.patternStrokeWidth,
-    showGrid: state.showGrid,
-    showBoundary: state.showBoundary,
-    showControlPoints: state.showControlPoints,
-    showPattern: state.showPattern,
-    controlPoints: state.controlPoints
-  };
-}

@@ -21,41 +21,56 @@ export type ConnectionPointType = "male" | "female" | "universal";
 
 export type PatternType = "cellular" | "vein" | "branch" | "dots" | "flow" | "tangent";
 
-export type ControlPoint = {
+export type Bubble = {
   id: string;
   x: number;
   y: number;
-  locked?: boolean;
+  r: number;
+  kind: "matter" | "carve";
+  stuck?: boolean;
 };
 
 export type NumericParam =
   | "widthMm"
   | "depthMm"
+  | "padding"
   | "seed"
-  | "density"
-  | "roundness"
-  | "connection"
-  | "organicNoise"
-  | "concaveAmount"
-  | "neckWidth"
+  | "bubbleCount"
+  | "minRadius"
+  | "maxRadius"
+  | "sizeVariation"
+  | "attraction"
+  | "repulsion"
+  | "mergeDistance"
+  | "boundaryStick"
+  | "carveBubbleCount"
+  | "carveRadius"
+  | "carveDepth"
   | "patternDensity"
   | "patternScale"
   | "patternStrokeWidth";
 
-export type BooleanParam = "showGrid" | "showBoundary" | "showControlPoints" | "showPattern";
+export type BooleanParam = "showGrid" | "showBoundary" | "showBubbles" | "showPattern" | "edgeCarveOnly";
 
 export type FormLabSnapshot = {
   mode: FormMode;
   boundaryShape: BoundaryShape;
   widthMm: number;
   depthMm: number;
+  padding: number;
   seed: number;
-  density: number;
-  roundness: number;
-  connection: number;
-  organicNoise: number;
-  concaveAmount: number;
-  neckWidth: number;
+  bubbleCount: number;
+  minRadius: number;
+  maxRadius: number;
+  sizeVariation: number;
+  attraction: number;
+  repulsion: number;
+  mergeDistance: number;
+  boundaryStick: number;
+  carveBubbleCount: number;
+  carveRadius: number;
+  carveDepth: number;
+  edgeCarveOnly: boolean;
   symmetry: Symmetry;
   tangentRule: TangentRule;
   cornerRule: CornerRule;
@@ -67,9 +82,10 @@ export type FormLabSnapshot = {
   patternStrokeWidth: number;
   showGrid: boolean;
   showBoundary: boolean;
-  showControlPoints: boolean;
+  showBubbles: boolean;
   showPattern: boolean;
-  controlPoints: ControlPoint[];
+  bubbles: Bubble[];
+  carveBubbles: Bubble[];
 };
 
 export type PresetName =

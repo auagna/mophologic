@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { boundaryPath, VIEWBOX } from "@/lib/geometry";
-import { connectionPointsForShape, generateOrganicShapePath } from "@/lib/generateShape";
+import { buildBubbleShape } from "@/lib/generateBubbleShape";
+import { VIEWBOX } from "@/lib/geometry";
 import { presets, useFormLabStore } from "@/store/useFormLabStore";
 import type { PresetName } from "@/types/formLab";
 import { Button } from "./ui/Button";
@@ -28,9 +28,7 @@ const arrangements: { title: string; modules: ModulePlacement[]; scale: number }
 
 export function AssemblyPreview() {
   const state = useFormLabStore();
-  const shapePath = useMemo(() => generateOrganicShapePath(state), [state]);
-  const guidePath = useMemo(() => boundaryPath(state.boundaryShape), [state.boundaryShape]);
-  const connectionPoints = useMemo(() => connectionPointsForShape(state), [state.connectionPointCount, state.boundaryShape, state.connectionPointType]);
+  const bubbleShape = useMemo(() => buildBubbleShape(state), [state]);
   const applyPreset = useFormLabStore((store) => store.applyPreset);
 
   return (
@@ -44,7 +42,7 @@ export function AssemblyPreview() {
         </div>
         <div className="grid gap-2">
           {arrangements.map((arrangement) => (
-            <PreviewItem key={arrangement.title} title={arrangement.title} path={shapePath} guidePath={guidePath} modules={arrangement.modules} scale={arrangement.scale} showPoints={state.showControlPoints} connectionPoints={connectionPoints} />
+            <PreviewItem key={arrangement.title} title={arrangement.title} path={bubbleShape.shapePath} guidePath={bubbleShape.boundaryPath} modules={arrangement.modules} scale={arrangement.scale} />
           ))}
         </div>
       </section>
@@ -68,17 +66,13 @@ function PreviewItem({
   path,
   guidePath,
   modules,
-  scale,
-  showPoints,
-  connectionPoints
+  scale
 }: {
   title: string;
   path: string;
   guidePath: string;
   modules: ModulePlacement[];
   scale: number;
-  showPoints: boolean;
-  connectionPoints: ReturnType<typeof connectionPointsForShape>;
 }) {
   return (
     <article className="border border-lab-border bg-[#0b0d10]">
@@ -93,11 +87,6 @@ function PreviewItem({
           <g key={index} transform={`translate(${module.x} ${module.y}) rotate(${module.rotate ?? 0}) scale(${scale}) translate(${-VIEWBOX.cx} ${-VIEWBOX.cy})`}>
             <path d={guidePath} fill="none" stroke="#f2efe5" strokeDasharray="8 10" strokeWidth="7" opacity="0.25" />
             <path d={path} fill="#050505" stroke="#f2efe5" strokeWidth="4" />
-            {showPoints
-              ? connectionPoints.map((point) => (
-                  <circle key={point.id} cx={point.x * VIEWBOX.width} cy={point.y * VIEWBOX.height} r="12" fill="#4e9dff" opacity="0.9" />
-                ))
-              : null}
           </g>
         ))}
       </svg>

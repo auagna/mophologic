@@ -2,35 +2,17 @@
 
 import { Dice5, RotateCcw } from "lucide-react";
 import { useFormLabStore } from "@/store/useFormLabStore";
-import type { BoundaryShape, ConnectionPointCount, ConnectionPointType, Symmetry, TangentRule } from "@/types/formLab";
+import type { BoundaryShape } from "@/types/formLab";
 import { Button } from "./ui/Button";
-import { SegmentedControl } from "./ui/SegmentedControl";
 import { Slider } from "./ui/Slider";
 
 const boundaryOptions: { value: BoundaryShape; label: string }[] = [
-  { value: "rectangle", label: "Rectangle" },
-  { value: "square", label: "Square" },
   { value: "circle", label: "정원 / Circle" },
   { value: "ellipse", label: "Ellipse" },
+  { value: "rectangle", label: "Rectangle" },
+  { value: "square", label: "Square" },
   { value: "capsule", label: "Capsule" },
-  { value: "roundedRect", label: "Rounded Rect" },
-  { value: "freeform", label: "Freeform" }
-];
-
-const tangentOptions: { value: TangentRule; label: string }[] = [
-  { value: "circle", label: "Circle" },
-  { value: "capsule", label: "Capsule" },
-  { value: "flat", label: "Flat" },
-  { value: "point", label: "Point" },
-  { value: "blob", label: "Blob" },
-  { value: "stem", label: "Stem" }
-];
-
-const symmetryOptions: { value: Symmetry; label: string }[] = [
-  { value: "none", label: "None" },
-  { value: "x", label: "X" },
-  { value: "y", label: "Y" },
-  { value: "radial", label: "Radial" }
+  { value: "freeform", label: "Custom Area" }
 ];
 
 export function ControlPanel() {
@@ -39,7 +21,7 @@ export function ControlPanel() {
 
   return (
     <aside className="lab-scrollbar overflow-auto border border-lab-border bg-lab-panel shadow-panel lg:max-h-[calc(100vh-82px)]">
-      <PanelSection title="Boundary Shape">
+      <PanelSection title="Boundary">
         <div className="grid grid-cols-2 gap-1.5">
           {boundaryOptions.map((option) => (
             <Button key={option.value} active={state.boundaryShape === option.value} onClick={() => state.setBoundaryShape(option.value)} className="justify-start">
@@ -51,54 +33,62 @@ export function ControlPanel() {
           <NumberField label="Width mm" value={state.widthMm} onChange={(value) => state.updateParam("widthMm", value)} />
           <NumberField label="Depth mm" value={state.depthMm} disabled={dimensionLocked} onChange={(value) => state.updateParam("depthMm", value)} />
         </div>
-        <Button onClick={() => {
-          state.updateParam("widthMm", 700);
-          state.updateParam("depthMm", 700);
-        }} className="w-full">
+        <Slider label="Padding" value={state.padding} min={0} max={90} suffix=" mm" onChange={(value) => state.updateParam("padding", value)} />
+        <Button
+          onClick={() => {
+            state.updateParam("widthMm", 700);
+            state.updateParam("depthMm", 700);
+            state.updateParam("padding", 34);
+          }}
+          className="w-full"
+        >
           <RotateCcw size={13} />
-          Fit to Canvas
+          Fit Boundary
         </Button>
       </PanelSection>
 
-      <PanelSection title="Form Generation">
+      <PanelSection title="Bubble">
         <div className="grid grid-cols-[1fr_auto] gap-2">
           <NumberField label="Seed" value={state.seed} onChange={(value) => state.updateParam("seed", value)} />
           <Button onClick={state.randomizeSeed} title="Randomize seed" aria-label="Randomize seed" className="self-end">
             <Dice5 size={14} />
           </Button>
         </div>
-        <Slider label="Density" value={state.density} min={0} max={100} onChange={(value) => state.updateParam("density", value)} />
-        <Slider label="Roundness" value={state.roundness} min={0} max={100} onChange={(value) => state.updateParam("roundness", value)} />
-        <Slider label="Connection" value={state.connection} min={0} max={100} onChange={(value) => state.updateParam("connection", value)} />
-        <Slider label="Organic Noise" value={state.organicNoise} min={0} max={100} onChange={(value) => state.updateParam("organicNoise", value)} />
-        <Slider label="Concave / Convex" value={state.concaveAmount} min={-100} max={100} hint="음푹  -  볼록" onChange={(value) => state.updateParam("concaveAmount", value)} />
-        <Slider label="Neck Width" value={state.neckWidth} min={0} max={100} onChange={(value) => state.updateParam("neckWidth", value)} />
+        <Slider label="Count" value={state.bubbleCount} min={4} max={90} onChange={(value) => state.updateParam("bubbleCount", value)} />
+        <Slider label="Min Radius" value={state.minRadius} min={12} max={120} suffix=" mm" onChange={(value) => state.updateParam("minRadius", value)} />
+        <Slider label="Max Radius" value={state.maxRadius} min={20} max={180} suffix=" mm" onChange={(value) => state.updateParam("maxRadius", value)} />
+        <Slider label="Size Variation" value={state.sizeVariation} min={0} max={100} onChange={(value) => state.updateParam("sizeVariation", value)} />
       </PanelSection>
 
-      <PanelSection title="Tangent Rule">
-        <SegmentedControl value={state.tangentRule} options={tangentOptions} onChange={state.setTangentRule} className="grid-cols-3" />
+      <PanelSection title="Behavior">
+        <Slider label="Attraction" value={state.attraction} min={0} max={100} onChange={(value) => state.updateParam("attraction", value)} />
+        <Slider label="Repulsion" value={state.repulsion} min={0} max={100} onChange={(value) => state.updateParam("repulsion", value)} />
+        <Slider label="Merge Distance" value={state.mergeDistance} min={0} max={120} suffix=" mm" onChange={(value) => state.updateParam("mergeDistance", value)} />
+        <Slider label="Boundary Stick" value={state.boundaryStick} min={0} max={100} onChange={(value) => state.updateParam("boundaryStick", value)} />
+        <Button onClick={state.regenerateBubbles} className="w-full">
+          <RotateCcw size={13} />
+          Regenerate Bubbles
+        </Button>
       </PanelSection>
 
-      <PanelSection title="Symmetry">
-        <SegmentedControl value={state.symmetry} options={symmetryOptions} onChange={state.setSymmetry} />
-      </PanelSection>
-
-      <PanelSection title="Connection Points">
-        <div className="grid grid-cols-4 gap-1.5">
-          {([4, 6, 8, 12] as ConnectionPointCount[]).map((count) => (
-            <Button key={count} active={state.connectionPointCount === count} onClick={() => state.setConnectionPointCount(count)}>
-              {count}
-            </Button>
-          ))}
-        </div>
-        <SegmentedControl
-          value={state.connectionPointType}
-          options={(["male", "female", "universal"] as ConnectionPointType[]).map((value) => ({ value, label: value }))}
-          onChange={state.setConnectionPointType}
-        />
+      <PanelSection title="Carve / Concave">
+        <Slider label="Carve Bubble Count" value={state.carveBubbleCount} min={0} max={24} onChange={(value) => state.updateParam("carveBubbleCount", value)} />
+        <Slider label="Carve Radius" value={state.carveRadius} min={10} max={150} suffix=" mm" onChange={(value) => state.updateParam("carveRadius", value)} />
+        <Slider label="Carve Depth" value={state.carveDepth} min={0} max={100} hint="subtract bubbles create inward dents" onChange={(value) => state.updateParam("carveDepth", value)} />
         <label className="flex items-center justify-between gap-3 text-[11px] text-lab-muted">
-          Show connection points
-          <input type="checkbox" checked={state.showControlPoints} onChange={(event) => state.updateParam("showControlPoints", event.target.checked)} className="h-4 w-4 accent-lab-blue" />
+          Edge Carve Only
+          <input type="checkbox" checked={state.edgeCarveOnly} onChange={(event) => state.updateParam("edgeCarveOnly", event.target.checked)} className="h-4 w-4 accent-lab-blue" />
+        </label>
+      </PanelSection>
+
+      <PanelSection title="Output">
+        <label className="flex items-center justify-between gap-3 text-[11px] text-lab-muted">
+          Show Generated Bubbles
+          <input type="checkbox" checked={state.showBubbles} onChange={(event) => state.updateParam("showBubbles", event.target.checked)} className="h-4 w-4 accent-lab-blue" />
+        </label>
+        <label className="flex items-center justify-between gap-3 text-[11px] text-lab-muted">
+          Show Boundary
+          <input type="checkbox" checked={state.showBoundary} onChange={(event) => state.updateParam("showBoundary", event.target.checked)} className="h-4 w-4 accent-lab-blue" />
         </label>
       </PanelSection>
     </aside>
