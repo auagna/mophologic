@@ -1,7 +1,7 @@
 "use client";
 
 import { LockKeyhole } from "lucide-react";
-import { PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { MouseEvent, PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { boundaryPath, clampPointToBoundary, fromSvgPoint, toSvgPoint, VIEWBOX } from "@/lib/geometry";
 import { generatePattern } from "@/lib/generatePattern";
 import { connectionPointsForShape, generateOrganicShapePath } from "@/lib/generateShape";
@@ -18,7 +18,7 @@ export function FormCanvas() {
   const pattern = useMemo(() => generatePattern(state), [state.seed, state.patternType, state.patternDensity, state.patternScale, state.patternStrokeWidth]);
   const connectionPoints = useMemo(() => connectionPointsForShape(state), [state.connectionPointCount, state.boundaryShape, state.connectionPointType]);
 
-  const pointFromEvent = useCallback((event: PointerEvent<SVGSVGElement>) => {
+  const pointFromEvent = useCallback((event: MouseEvent<SVGSVGElement> | PointerEvent<SVGSVGElement>) => {
     const svg = svgRef.current;
     if (!svg) return null;
     const rect = svg.getBoundingClientRect();
