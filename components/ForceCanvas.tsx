@@ -34,8 +34,10 @@ export function ForceCanvas() {
 
   useEffect(() => {
     function tick() {
-      useSimStore.getState().step();
-      setFrame((value) => (value + 1) % 100000);
+      if (!useSimStore.getState().isPaused) {
+        useSimStore.getState().step();
+        setFrame((value) => (value + 1) % 100000);
+      }
       frameRef.current = requestAnimationFrame(tick);
     }
 
