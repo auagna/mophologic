@@ -1,5 +1,5 @@
-import { AppShell } from "@/components/AppShell";
+import { FormLab } from "@/components/FormLab";
 
 export default function Home() {
-  return <AppShell />;
+  return <FormLab />;
 }
