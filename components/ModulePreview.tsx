@@ -51,8 +51,8 @@ export function ModulePreview() {
               <path d={fieldPath} fill={params.bubbleFillColor} stroke={params.bubbleFillColor} strokeLinejoin="round" strokeWidth="2" />
             ) : (
               <>
-                <path d={bubbleFieldPath} fill={params.bubbleFillColor} stroke={params.bubbleFillColor} strokeLinejoin="round" strokeWidth="2" />
                 {axes.length > 0 ? <path d={axisFieldPath} fill={params.axisFillColor} stroke={params.axisFillColor} strokeLinejoin="round" strokeWidth="2" /> : null}
+                <path d={bubbleFieldPath} fill={params.bubbleFillColor} stroke={params.bubbleFillColor} strokeLinejoin="round" strokeWidth="2" />
               </>
             )}
 
