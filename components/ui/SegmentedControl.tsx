@@ -15,8 +15,12 @@ type SegmentedControlProps<T extends string> = {
 };
 
 export function SegmentedControl<T extends string>({ value, options, onChange, className }: SegmentedControlProps<T>) {
+  const usesExplicitColumns = className?.includes("grid-cols-");
   return (
-    <div className={clsx("grid rounded border border-lab-border bg-[#0b0d10] p-0.5", className)} style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}>
+    <div
+      className={clsx("grid rounded border border-lab-border bg-[#0b0d10] p-0.5", className)}
+      style={usesExplicitColumns ? undefined : { gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
+    >
       {options.map((option) => (
         <button
           key={option.value}
