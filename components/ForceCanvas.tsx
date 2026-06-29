@@ -144,7 +144,7 @@ export function ForceCanvas() {
 
           {visual.showMergedShape || patternMode === "metaball" || patternMode === "carved" ? (
             <g clipPath="url(#force-boundary-clip)" data-signed-field-shape>
-              <path d={fieldPath} fill="#050505" fillRule="nonzero" data-field-path />
+              <path d={fieldPath} fill="#050505" stroke="#050505" strokeLinejoin="round" strokeWidth="1.4" fillRule="nonzero" data-field-path />
               <g clipPath="url(#force-field-shape-clip)">{renderPattern(patternMode, massBubbles, links)}</g>
             </g>
           ) : null}
@@ -211,18 +211,31 @@ function BubbleCircle({
 }) {
   const isCarve = bubble.kind === "carve";
   return (
-    <circle
-      data-bubble-id={bubble.id}
-      cx={bubble.x}
-      cy={bubble.y}
-      r={bubble.r}
-      fill={isCarve ? "rgba(255,255,255,0.46)" : "rgba(78,157,255,0.13)"}
-      stroke={selected ? "#ffffff" : isCarve ? "#f2efe5" : bubble.fixed ? "#2f7fd2" : "#4e9dff"}
-      strokeDasharray={bubble.fixed ? "6 4" : undefined}
-      strokeWidth={selected ? 3 : 1.6}
-      className="cursor-grab active:cursor-grabbing"
-      onPointerDown={onPointerDown}
-    />
+    <>
+      <circle
+        data-bubble-id={bubble.id}
+        cx={bubble.x}
+        cy={bubble.y}
+        r={bubble.r}
+        fill={isCarve ? "rgba(255,255,255,0.46)" : "rgba(78,157,255,0.13)"}
+        stroke={selected ? "#ffffff" : isCarve ? "#f2efe5" : bubble.fixed ? "#2f7fd2" : "#4e9dff"}
+        strokeDasharray={bubble.fixed ? "6 4" : undefined}
+        strokeWidth={selected ? 3 : 1.6}
+        className="cursor-grab active:cursor-grabbing"
+        onPointerDown={onPointerDown}
+      />
+      <text
+        x={bubble.x}
+        y={bubble.y + 5}
+        fill={isCarve ? "#776f63" : "#4e9dff"}
+        fontSize={bubble.r * 0.44}
+        textAnchor="middle"
+        pointerEvents="none"
+        opacity={selected ? 0.95 : 0.58}
+      >
+        {isCarve ? "-" : "+"}
+      </text>
+    </>
   );
 }
 

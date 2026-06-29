@@ -22,7 +22,7 @@ export function ModulePreview() {
   const params = useSimStore((state) => state.params);
   const mass = bubbles.filter((bubble) => bubble.kind === "mass");
   const carve = bubbles.filter((bubble) => bubble.kind === "carve");
-  const fieldPath = useMemo(() => buildSignedFieldPath(bubbles, boundary, params, { step: 8 }), [bubbles, boundary, params]);
+  const fieldPath = useMemo(() => buildSignedFieldPath(bubbles, boundary, params, { step: 7 }), [bubbles, boundary, params]);
 
   return (
     <aside className="lab-scrollbar max-h-[calc(100vh-5rem)] overflow-auto border border-lab-border bg-lab-panel shadow-panel">
@@ -64,7 +64,7 @@ function ModuleGlyph({
 }) {
   return (
     <g transform={`translate(${transform.x} ${transform.y}) scale(${transform.s}) translate(-450 -310)`}>
-      <path d={fieldPath} fill="#050505" />
+      <path d={fieldPath} fill="#050505" stroke="#050505" strokeLinejoin="round" strokeWidth="2" />
       <g opacity="0.4">
         {mass.slice(0, 12).map((bubble) => (
           <circle key={`m-${bubble.id}`} cx={bubble.x} cy={bubble.y} r={bubble.r} fill="none" stroke="#f4f1e8" strokeWidth="4" />

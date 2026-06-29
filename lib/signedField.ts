@@ -35,7 +35,7 @@ export function fieldValueAt(x: number, y: number, bubbles: Bubble[]) {
 }
 
 export function buildSignedFieldPath(bubbles: Bubble[], boundary: Boundary, params: SimParams, options: FieldOptions = {}) {
-  const step = options.step ?? 8;
+  const step = options.step ?? 6;
   const threshold = options.threshold ?? Math.max(0.7, 1.22 - params.linkDistance * 0.0035 - params.mergeBlur * 0.012);
   const parts: string[] = [];
 
