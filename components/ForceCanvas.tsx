@@ -305,6 +305,25 @@ export function ForceCanvas() {
             </g>
           ) : null}
 
+          <g data-bubble-control-layer>
+            {bubbles.map((bubble) => (
+              <BubbleHandle
+                key={`handle-${bubble.id}`}
+                bubble={bubble}
+                onPointerDown={(event) => {
+                  event.stopPropagation();
+                  selectBubble(bubble.id);
+                  if (event.shiftKey) {
+                    toggleFixed(bubble.id);
+                    return;
+                  }
+                  dragTarget.current = { type: "bubble", id: bubble.id };
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                }}
+              />
+            ))}
+          </g>
+
           {axes.length > 0 ? (
             <g clipPath="url(#force-boundary-clip)" data-axis-control-layer>
               {axisNodes.map((node) => (
@@ -327,6 +346,21 @@ export function ForceCanvas() {
         </svg>
       </div>
     </section>
+  );
+}
+
+function BubbleHandle({ bubble, onPointerDown }: { bubble: Bubble; onPointerDown: (event: PointerEvent<SVGCircleElement>) => void }) {
+  return (
+    <circle
+      data-bubble-control-id={bubble.id}
+      cx={bubble.x}
+      cy={bubble.y}
+      r={bubble.r}
+      fill="transparent"
+      pointerEvents="all"
+      className="cursor-grab active:cursor-grabbing"
+      onPointerDown={onPointerDown}
+    />
   );
 }
 
