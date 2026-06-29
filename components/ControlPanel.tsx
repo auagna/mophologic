@@ -157,7 +157,14 @@ function ColorControl({ label, value, onChange }: { label: string; value: string
     <label className="grid gap-1.5 text-[11px] text-lab-muted">
       {label}
       <span className="flex h-8 items-center gap-2 border border-lab-border bg-[#0b0d10] px-2">
-        <input type="color" value={value} onChange={(event) => onChange(event.target.value)} className="h-5 w-8 cursor-pointer border-0 bg-transparent p-0" />
+        <input
+          type="color"
+          aria-label={label}
+          value={value}
+          onInput={(event) => onChange(event.currentTarget.value)}
+          onChange={(event) => onChange(event.currentTarget.value)}
+          className="h-5 w-8 cursor-pointer border-0 bg-transparent p-0"
+        />
         <span className="min-w-0 flex-1 truncate text-[10px] uppercase tabular-nums text-lab-text">{value}</span>
       </span>
     </label>
