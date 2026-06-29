@@ -1,5 +1,5 @@
 import { isInsideBoundary } from "@/lib/boundary";
-import type { Boundary, Bubble, SimParams } from "@/types";
+import type { Axis, Boundary, Bubble, SimParams } from "@/types";
 
 type Point = {
   x: number;
@@ -34,7 +34,20 @@ export function fieldValueAt(x: number, y: number, bubbles: Bubble[]) {
   return value;
 }
 
-export function buildSignedFieldPath(bubbles: Bubble[], boundary: Boundary, params: SimParams, options: FieldOptions = {}) {
+export function fieldValueAtWithAxes(x: number, y: number, bubbles: Bubble[], axes: Axis[]) {
+  let value = fieldValueAt(x, y, bubbles);
+
+  for (const axis of axes) {
+    const distance = distanceToSegment(x, y, axis.x1, axis.y1, axis.x2, axis.y2);
+    const r = axis.thickness / 2;
+    const r2 = r * r;
+    value += (r2 * 1.25) / (distance * distance + r2 * 0.24);
+  }
+
+  return value;
+}
+
+export function buildSignedFieldPath(bubbles: Bubble[], axes: Axis[], boundary: Boundary, params: SimParams, options: FieldOptions = {}) {
   const step = options.step ?? 8;
   const threshold = options.threshold ?? Math.max(0.7, 1.22 - params.linkDistance * 0.0035 - params.mergeBlur * 0.012);
   const parts: string[] = [];
@@ -42,10 +55,10 @@ export function buildSignedFieldPath(bubbles: Bubble[], boundary: Boundary, para
   for (let y = 0; y < 620; y += step) {
     for (let x = 0; x < 900; x += step) {
       const corners: [Corner, Corner, Corner, Corner] = [
-        sampleCorner(x, y, bubbles, boundary),
-        sampleCorner(x + step, y, bubbles, boundary),
-        sampleCorner(x + step, y + step, bubbles, boundary),
-        sampleCorner(x, y + step, bubbles, boundary)
+        sampleCorner(x, y, bubbles, axes, boundary),
+        sampleCorner(x + step, y, bubbles, axes, boundary),
+        sampleCorner(x + step, y + step, bubbles, axes, boundary),
+        sampleCorner(x, y + step, bubbles, axes, boundary)
       ];
       const polygons = cellPolygons(corners, threshold);
       for (const polygon of polygons) {
@@ -57,11 +70,11 @@ export function buildSignedFieldPath(bubbles: Bubble[], boundary: Boundary, para
   return parts.join(" ");
 }
 
-function sampleCorner(x: number, y: number, bubbles: Bubble[], boundary: Boundary): Corner {
+function sampleCorner(x: number, y: number, bubbles: Bubble[], axes: Axis[], boundary: Boundary): Corner {
   if (!isInsideBoundary(x, y, 0, boundary)) {
     return { x, y, v: -999 };
   }
-  return { x, y, v: fieldValueAt(x, y, bubbles) };
+  return { x, y, v: fieldValueAtWithAxes(x, y, bubbles, axes) };
 }
 
 function cellPolygons(corners: [Corner, Corner, Corner, Corner], threshold: number): Point[][] {
@@ -141,4 +154,15 @@ function format(value: number) {
 
 function clamp01(value: number) {
   return Math.min(1, Math.max(0, value));
+}
+
+function distanceToSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number) {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared <= 0.0001) return Math.hypot(px - ax, py - ay);
+  const t = clamp01(((px - ax) * dx + (py - ay) * dy) / lengthSquared);
+  const x = ax + dx * t;
+  const y = ay + dy * t;
+  return Math.hypot(px - x, py - y);
 }

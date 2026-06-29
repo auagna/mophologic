@@ -18,6 +18,7 @@ export function ForceCanvas() {
   const boundary = useSimStore((state) => state.boundary);
   const params = useSimStore((state) => state.params);
   const bubbles = useSimStore((state) => state.bubbles);
+  const axes = useSimStore((state) => state.axes);
   const selectedId = useSimStore((state) => state.selectedId);
   const patternMode = useSimStore((state) => state.patternMode);
   const visual = useSimStore((state) => state.visual);
@@ -32,7 +33,7 @@ export function ForceCanvas() {
   const massBubbles = useMemo(() => bubbles.filter((bubble) => bubble.kind === "mass"), [bubbles]);
   const carveBubbles = useMemo(() => bubbles.filter((bubble) => bubble.kind === "carve"), [bubbles]);
   const links = useMemo(() => linksForBubbles(bubbles, params), [bubbles, params]);
-  const fieldPath = useMemo(() => buildSignedFieldPath(bubbles, boundary, params), [bubbles, boundary, params]);
+  const fieldPath = useMemo(() => buildSignedFieldPath(bubbles, axes, boundary, params), [bubbles, axes, boundary, params]);
 
   useEffect(() => {
     function tick() {
@@ -136,6 +137,19 @@ export function ForceCanvas() {
 
           {visual.showLinks || patternMode === "network" ? (
             <g clipPath="url(#force-boundary-clip)">
+              {axes.map((axis) => (
+                <line
+                  key={axis.id}
+                  x1={axis.x1}
+                  y1={axis.y1}
+                  x2={axis.x2}
+                  y2={axis.y2}
+                  stroke="#4e9dff"
+                  strokeLinecap="round"
+                  strokeWidth={Math.max(2, axis.thickness * 0.08)}
+                  opacity="0.42"
+                />
+              ))}
               {links.map((link) => (
                 <line key={`${link.a.id}-${link.b.id}`} x1={link.a.x} y1={link.a.y} x2={link.b.x} y2={link.b.y} stroke="#6d7480" strokeWidth="1.2" opacity={link.opacity * 0.82} />
               ))}

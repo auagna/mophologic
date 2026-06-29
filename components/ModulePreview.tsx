@@ -19,10 +19,11 @@ const layouts = [
 export function ModulePreview() {
   const boundary = useSimStore((state) => state.boundary);
   const bubbles = useSimStore((state) => state.bubbles);
+  const axes = useSimStore((state) => state.axes);
   const params = useSimStore((state) => state.params);
   const mass = bubbles.filter((bubble) => bubble.kind === "mass");
   const carve = bubbles.filter((bubble) => bubble.kind === "carve");
-  const fieldPath = useMemo(() => buildSignedFieldPath(bubbles, boundary, params, { step: 7 }), [bubbles, boundary, params]);
+  const fieldPath = useMemo(() => buildSignedFieldPath(bubbles, axes, boundary, params, { step: 8 }), [bubbles, axes, boundary, params]);
 
   return (
     <aside className="lab-scrollbar max-h-[calc(100vh-5rem)] overflow-auto border border-lab-border bg-lab-panel shadow-panel">

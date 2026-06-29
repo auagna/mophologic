@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Slider } from "@/components/ui/Slider";
 import { useSimStore } from "@/store/useSimStore";
-import type { Boundary, PatternMode } from "@/types";
+import type { Boundary, PatternMode, SimParams } from "@/types";
 
 const boundaryOptions: Array<{ value: Boundary["shape"]; label: string }> = [
   { value: "circle", label: "Circle" },
@@ -21,6 +21,12 @@ const patternOptions: Array<{ value: PatternMode; label: string }> = [
   { value: "ring", label: "Ring" },
   { value: "bubble", label: "Bubble" },
   { value: "carved", label: "Carved" }
+];
+
+const generationOptions: Array<{ value: SimParams["generationMode"]; label: string }> = [
+  { value: "bubble", label: "Bubble" },
+  { value: "axis", label: "Axis" },
+  { value: "hybrid", label: "Hybrid" }
 ];
 
 export function ControlPanel() {
@@ -72,6 +78,7 @@ export function ControlPanel() {
               className="h-8 border border-lab-border bg-[#0b0d10] px-2 text-[12px] tabular-nums text-lab-text outline-none focus:border-lab-blue"
             />
           </label>
+          <SegmentedControl value={params.generationMode} options={generationOptions} onChange={(value) => updateParam("generationMode", value)} className="grid-cols-3" />
         </section>
 
         <section className="grid gap-3">
@@ -83,11 +90,25 @@ export function ControlPanel() {
         </section>
 
         <section className="grid gap-3">
-          <PanelTitle>Bubbles</PanelTitle>
-          <Slider label="Bubble Count" value={params.bubbleCount} min={4} max={70} step={1} onChange={(value) => updateParam("bubbleCount", value)} />
-          <Slider label="Min Radius" value={params.minRadius} min={8} max={58} step={1} suffix=" px" onChange={(value) => updateParam("minRadius", Math.min(value, params.maxRadius))} />
-          <Slider label="Max Radius" value={params.maxRadius} min={16} max={92} step={1} suffix=" px" onChange={(value) => updateParam("maxRadius", Math.max(value, params.minRadius))} />
-          <Slider label="Carve Count" value={params.carveCount} min={0} max={18} step={1} onChange={(value) => updateParam("carveCount", value)} />
+          <PanelTitle>+ Bubbles</PanelTitle>
+          <Slider label="+ Count" value={params.bubbleCount} min={0} max={70} step={1} onChange={(value) => updateParam("bubbleCount", value)} />
+          <Slider label="+ Min Radius" value={params.minRadius} min={8} max={70} step={1} suffix=" px" onChange={(value) => updateParam("minRadius", Math.min(value, params.maxRadius))} />
+          <Slider label="+ Max Radius" value={params.maxRadius} min={12} max={110} step={1} suffix=" px" onChange={(value) => updateParam("maxRadius", Math.max(value, params.minRadius))} />
+        </section>
+
+        <section className="grid gap-3">
+          <PanelTitle>- Bubbles</PanelTitle>
+          <Slider label="- Count" value={params.carveCount} min={0} max={24} step={1} onChange={(value) => updateParam("carveCount", value)} />
+          <Slider label="- Min Radius" value={params.carveMinRadius} min={8} max={80} step={1} suffix=" px" onChange={(value) => updateParam("carveMinRadius", Math.min(value, params.carveMaxRadius))} />
+          <Slider label="- Max Radius" value={params.carveMaxRadius} min={12} max={128} step={1} suffix=" px" onChange={(value) => updateParam("carveMaxRadius", Math.max(value, params.carveMinRadius))} />
+        </section>
+
+        <section className="grid gap-3">
+          <PanelTitle>Axis</PanelTitle>
+          <Slider label="Axis Count" value={params.axisCount} min={1} max={8} step={1} onChange={(value) => updateParam("axisCount", value)} />
+          <Slider label="Axis Length" value={params.axisLength} min={80} max={520} step={10} suffix=" px" onChange={(value) => updateParam("axisLength", value)} />
+          <Slider label="Axis Angle" value={params.axisAngle} min={-90} max={90} step={1} suffix="°" onChange={(value) => updateParam("axisAngle", value)} />
+          <Slider label="Axis Thickness" value={params.axisThickness} min={12} max={120} step={2} suffix=" px" onChange={(value) => updateParam("axisThickness", value)} />
         </section>
 
         <section className="grid gap-3">

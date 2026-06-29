@@ -1,6 +1,6 @@
 import { clampBubbleToBoundary, isInsideBoundary, VIEWBOX } from "@/lib/boundary";
 import { createSeededRandom, randomBetween } from "@/lib/seededRandom";
-import type { Boundary, Bubble, SimParams } from "@/types";
+import type { Axis, Boundary, Bubble, SimParams } from "@/types";
 
 export function createDefaultBoundary(): Boundary {
   return {
@@ -16,10 +16,17 @@ export function createDefaultBoundary(): Boundary {
 export function createDefaultParams(): SimParams {
   return {
     seed: 2417,
+    generationMode: "bubble",
     bubbleCount: 32,
     minRadius: 22,
     maxRadius: 58,
     carveCount: 6,
+    carveMinRadius: 22,
+    carveMaxRadius: 64,
+    axisCount: 3,
+    axisLength: 260,
+    axisAngle: -28,
+    axisThickness: 52,
     attractionStrength: 0.012,
     repulsionStrength: 0.09,
     damping: 0.88,
@@ -32,11 +39,15 @@ export function createDefaultParams(): SimParams {
 export function generateBubbles(params: SimParams, boundary: Boundary): Bubble[] {
   const random = createSeededRandom(params.seed);
   const bubbles: Bubble[] = [];
-  const total = params.bubbleCount + params.carveCount;
+  const massCount = params.generationMode === "axis" ? 0 : params.bubbleCount;
+  const total = massCount + params.carveCount;
 
   for (let index = 0; index < total; index += 1) {
-    const kind: Bubble["kind"] = index < params.bubbleCount ? "mass" : "carve";
-    const radius = kind === "mass" ? randomBetween(random, params.minRadius, params.maxRadius) : randomBetween(random, params.minRadius * 0.7, params.maxRadius * 1.08);
+    const kind: Bubble["kind"] = index < massCount ? "mass" : "carve";
+    const radius =
+      kind === "mass"
+        ? randomBetween(random, params.minRadius, params.maxRadius)
+        : randomBetween(random, params.carveMinRadius, params.carveMaxRadius);
     const placed = placeBubble(random, boundary, radius, kind);
     bubbles.push({
       id: `${kind}-${params.seed}-${index}`,
@@ -50,6 +61,65 @@ export function generateBubbles(params: SimParams, boundary: Boundary): Bubble[]
   }
 
   return bubbles;
+}
+
+export function generateAxes(params: SimParams, boundary: Boundary): Axis[] {
+  if (params.generationMode === "bubble") return [];
+
+  const random = createSeededRandom(params.seed + 911);
+  const axes: Axis[] = [];
+  const angleBase = (params.axisAngle * Math.PI) / 180;
+  const angleSpread = params.generationMode === "axis" ? Math.PI * 0.22 : Math.PI * 0.38;
+
+  for (let index = 0; index < params.axisCount; index += 1) {
+    const length = randomBetween(random, params.axisLength * 0.72, params.axisLength * 1.08);
+    const thickness = randomBetween(random, params.axisThickness * 0.78, params.axisThickness * 1.18);
+    const angle = angleBase + randomBetween(random, -angleSpread, angleSpread);
+    const half = length / 2;
+    const dx = Math.cos(angle) * half;
+    const dy = Math.sin(angle) * half;
+    const center = placeAxisCenter(random, boundary, dx, dy, thickness);
+
+    axes.push({
+      id: `axis-${params.seed}-${index}`,
+      x1: center.x - dx,
+      y1: center.y - dy,
+      x2: center.x + dx,
+      y2: center.y + dy,
+      thickness,
+      kind: "mass"
+    });
+  }
+
+  return axes;
+}
+
+export function axisEndpointBubbles(axes: Axis[]): Bubble[] {
+  return axes.flatMap((axis, index) => {
+    const r = axis.thickness * 0.5;
+    return [
+      {
+        id: `${axis.id}-a`,
+        x: axis.x1,
+        y: axis.y1,
+        vx: 0,
+        vy: 0,
+        r,
+        kind: "mass" as const,
+        fixed: true
+      },
+      {
+        id: `${axis.id}-b`,
+        x: axis.x2,
+        y: axis.y2,
+        vx: 0,
+        vy: 0,
+        r,
+        kind: "mass" as const,
+        fixed: true
+      }
+    ].map((bubble) => ({ ...bubble, id: `${bubble.id}-${index}` }));
+  });
 }
 
 function placeBubble(random: () => number, boundary: Boundary, r: number, kind: Bubble["kind"]) {
@@ -70,6 +140,24 @@ function placeBubble(random: () => number, boundary: Boundary, r: number, kind: 
     const x = randomBetween(random, left + r, left + innerW - r);
     const y = randomBetween(random, top + r, top + innerH - r);
     if (isInsideBoundary(x, y, r, boundary)) return { x, y };
+  }
+
+  return { x: boundary.cx, y: boundary.cy };
+}
+
+function placeAxisCenter(random: () => number, boundary: Boundary, dx: number, dy: number, thickness: number) {
+  const r = thickness / 2;
+  const innerW = boundary.width - boundary.padding * 2;
+  const innerH = boundary.height - boundary.padding * 2;
+  const left = boundary.cx - innerW / 2;
+  const top = boundary.cy - innerH / 2;
+
+  for (let attempt = 0; attempt < 900; attempt += 1) {
+    const x = randomBetween(random, left + r, left + innerW - r);
+    const y = randomBetween(random, top + r, top + innerH - r);
+    if (isInsideBoundary(x - dx, y - dy, r, boundary) && isInsideBoundary(x + dx, y + dy, r, boundary)) {
+      return { x, y };
+    }
   }
 
   return { x: boundary.cx, y: boundary.cy };

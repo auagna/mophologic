@@ -3,8 +3,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { clampBubbleToBoundary, isInsideBoundary } from "@/lib/boundary";
-import { createDefaultBoundary, createDefaultParams, generateBubbles, stepSimulation } from "@/lib/forces";
-import type { Boundary, Bubble, PatternMode, SimParams } from "@/types";
+import { axisEndpointBubbles, createDefaultBoundary, createDefaultParams, generateAxes, generateBubbles, stepSimulation } from "@/lib/forces";
+import type { Axis, Boundary, Bubble, PatternMode, SimParams } from "@/types";
 
 type VisualFlags = {
   showBubbles: boolean;
@@ -17,6 +17,7 @@ type SimState = {
   boundary: Boundary;
   params: SimParams;
   bubbles: Bubble[];
+  axes: Axis[];
   isPaused: boolean;
   selectedId: string | null;
   patternMode: PatternMode;
@@ -39,13 +40,46 @@ type SimState = {
 
 const initialBoundary = createDefaultBoundary();
 const initialParams = createDefaultParams();
+const initialGenerated = regenerate(initialParams, initialBoundary);
 
 function regenerate(params: SimParams, boundary: Boundary) {
-  return generateBubbles(params, boundary);
+  const safeParams = normalizeParams(params);
+  const axes = generateAxes(safeParams, boundary);
+  const bubbles = generateBubbles(safeParams, boundary);
+  const axisNodes = safeParams.generationMode === "bubble" ? [] : axisEndpointBubbles(axes);
+  return {
+    params: safeParams,
+    axes,
+    bubbles: [...axisNodes, ...bubbles]
+  };
 }
 
 function changesBubblePopulation(key: keyof SimParams) {
-  return key === "seed" || key === "bubbleCount" || key === "minRadius" || key === "maxRadius" || key === "carveCount";
+  return [
+    "seed",
+    "generationMode",
+    "bubbleCount",
+    "minRadius",
+    "maxRadius",
+    "carveCount",
+    "carveMinRadius",
+    "carveMaxRadius",
+    "axisCount",
+    "axisLength",
+    "axisAngle",
+    "axisThickness"
+  ].includes(key);
+}
+
+function normalizeParams(params: SimParams): SimParams {
+  return {
+    ...initialParams,
+    ...params,
+    carveMinRadius: Math.min(params.carveMinRadius ?? initialParams.carveMinRadius, params.carveMaxRadius ?? initialParams.carveMaxRadius),
+    carveMaxRadius: Math.max(params.carveMaxRadius ?? initialParams.carveMaxRadius, params.carveMinRadius ?? initialParams.carveMinRadius),
+    minRadius: Math.min(params.minRadius ?? initialParams.minRadius, params.maxRadius ?? initialParams.maxRadius),
+    maxRadius: Math.max(params.maxRadius ?? initialParams.maxRadius, params.minRadius ?? initialParams.minRadius)
+  };
 }
 
 export const useSimStore = create<SimState>()(
@@ -53,7 +87,8 @@ export const useSimStore = create<SimState>()(
     (set) => ({
       boundary: initialBoundary,
       params: initialParams,
-      bubbles: regenerate(initialParams, initialBoundary),
+      bubbles: initialGenerated.bubbles,
+      axes: initialGenerated.axes,
       isPaused: false,
       selectedId: null,
       patternMode: "metaball",
@@ -66,18 +101,21 @@ export const useSimStore = create<SimState>()(
       setBoundaryShape: (shape) =>
         set((state) => {
           const boundary = { ...state.boundary, shape };
-          return { boundary, bubbles: regenerate(state.params, boundary), selectedId: null };
+          const generated = regenerate(state.params, boundary);
+          return { boundary, params: generated.params, bubbles: generated.bubbles, axes: generated.axes, selectedId: null };
         }),
       updateBoundary: (key, value) =>
         set((state) => {
           const boundary = { ...state.boundary, [key]: value };
-          return { boundary, bubbles: regenerate(state.params, boundary), selectedId: null };
+          const generated = regenerate(state.params, boundary);
+          return { boundary, params: generated.params, bubbles: generated.bubbles, axes: generated.axes, selectedId: null };
         }),
       updateParam: (key, value) =>
         set((state) => {
-          const params = { ...state.params, [key]: value };
+          const params = normalizeParams({ ...state.params, [key]: value });
           if (changesBubblePopulation(key)) {
-            return { params, bubbles: regenerate(params, state.boundary), selectedId: null };
+            const generated = regenerate(params, state.boundary);
+            return { params: generated.params, bubbles: generated.bubbles, axes: generated.axes, selectedId: null };
           }
           return { params };
         }),
@@ -85,15 +123,21 @@ export const useSimStore = create<SimState>()(
       toggleVisual: (key) => set((state) => ({ visual: { ...state.visual, [key]: !state.visual[key] } })),
       randomizeSeed: () =>
         set((state) => {
-          const params = { ...state.params, seed: Math.floor(1000 + Math.random() * 900000) };
-          return { params, bubbles: regenerate(params, state.boundary), selectedId: null, isPaused: false };
+          const params = normalizeParams({ ...state.params, seed: Math.floor(1000 + Math.random() * 900000) });
+          const generated = regenerate(params, state.boundary);
+          return { params: generated.params, bubbles: generated.bubbles, axes: generated.axes, selectedId: null, isPaused: false };
         }),
       resetSimulation: () =>
-        set((state) => ({
-          bubbles: regenerate(state.params, state.boundary),
-          selectedId: null,
-          isPaused: false
-        })),
+        set((state) => {
+          const generated = regenerate(state.params, state.boundary);
+          return {
+            params: generated.params,
+            bubbles: generated.bubbles,
+            axes: generated.axes,
+            selectedId: null,
+            isPaused: false
+          };
+        }),
       setPaused: (isPaused) => set({ isPaused }),
       step: () =>
         set((state) => {
@@ -114,7 +158,7 @@ export const useSimStore = create<SimState>()(
         })),
       addBubble: (kind, x, y) =>
         set((state) => {
-          const r = kind === "mass" ? (state.params.minRadius + state.params.maxRadius) / 2 : state.params.maxRadius * 0.85;
+          const r = kind === "mass" ? (state.params.minRadius + state.params.maxRadius) / 2 : (state.params.carveMinRadius + state.params.carveMaxRadius) / 2;
           if (!isInsideBoundary(x, y, r, state.boundary)) return state;
           const bubble: Bubble = {
             id: `${kind}-${Date.now()}-${Math.round(x)}-${Math.round(y)}`,
@@ -152,7 +196,22 @@ export const useSimStore = create<SimState>()(
     }),
     {
       name: "form-lab-force-state",
-      version: 1,
+      version: 2,
+      migrate: (persisted) => {
+        const state = persisted as Partial<SimState>;
+        const boundary = state.boundary ?? initialBoundary;
+        const params = normalizeParams({ ...initialParams, ...state.params });
+        const generated = regenerate(params, boundary);
+        return {
+          ...state,
+          boundary,
+          params: generated.params,
+          bubbles: generated.bubbles,
+          axes: generated.axes,
+          selectedId: null,
+          isPaused: false
+        } as SimState;
+      },
       partialize: (state) => ({
         boundary: state.boundary,
         params: state.params,
@@ -161,7 +220,10 @@ export const useSimStore = create<SimState>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return;
-        state.bubbles = regenerate(state.params, state.boundary);
+        const generated = regenerate(state.params, state.boundary);
+        state.params = generated.params;
+        state.bubbles = generated.bubbles;
+        state.axes = generated.axes;
         state.selectedId = null;
         state.isPaused = false;
       }

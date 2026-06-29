@@ -9,6 +9,16 @@ export type Bubble = {
   fixed?: boolean;
 };
 
+export type Axis = {
+  id: string;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  thickness: number;
+  kind: "mass";
+};
+
 export type Boundary = {
   shape: "circle" | "ellipse" | "rectangle" | "capsule";
   cx: number;
@@ -20,10 +30,17 @@ export type Boundary = {
 
 export type SimParams = {
   seed: number;
+  generationMode: "bubble" | "axis" | "hybrid";
   bubbleCount: number;
   minRadius: number;
   maxRadius: number;
   carveCount: number;
+  carveMinRadius: number;
+  carveMaxRadius: number;
+  axisCount: number;
+  axisLength: number;
+  axisAngle: number;
+  axisThickness: number;
   attractionStrength: number;
   repulsionStrength: number;
   damping: number;
