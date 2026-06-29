@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { clampBubbleToBoundary, isInsideBoundary } from "@/lib/boundary";
-import { axisEndpointBubbles, createDefaultBoundary, createDefaultParams, generateAxes, generateBubbles, stepSimulation } from "@/lib/forces";
+import { createDefaultBoundary, createDefaultParams, generateAxes, generateBubbles, stepSimulation } from "@/lib/forces";
 import type { Axis, Boundary, Bubble, PatternMode, SimParams } from "@/types";
 
 type VisualFlags = {
@@ -46,11 +46,10 @@ function regenerate(params: SimParams, boundary: Boundary) {
   const safeParams = normalizeParams(params);
   const axes = generateAxes(safeParams, boundary);
   const bubbles = generateBubbles(safeParams, boundary);
-  const axisNodes = safeParams.generationMode === "bubble" ? [] : axisEndpointBubbles(axes);
   return {
     params: safeParams,
     axes,
-    bubbles: [...axisNodes, ...bubbles]
+    bubbles
   };
 }
 

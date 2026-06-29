@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo } from "react";
+import { axisNodesForAxes } from "@/lib/forces";
 import { buildSignedFieldPath } from "@/lib/signedField";
 import { useSimStore } from "@/store/useSimStore";
-import type { Bubble } from "@/types";
+import type { Axis, Bubble } from "@/types";
 
 const layouts = [
   { label: "Single module", transforms: [{ x: 150, y: 58, s: 0.2 }] },
@@ -30,7 +31,7 @@ export function ModulePreview() {
       <div className="grid gap-3 p-3">
         <div className="flex items-center justify-between border-b border-lab-border pb-2">
           <h2 className="text-[11px] font-semibold uppercase tracking-normal text-lab-text">Module Preview</h2>
-          <span className="text-[11px] text-lab-muted">{mass.length} mass / {carve.length} carve</span>
+          <span className="text-[11px] text-lab-muted">{mass.length} + / {axes.length} axis / {carve.length} -</span>
         </div>
         {layouts.map((layout, index) => (
           <section key={layout.label} className="border border-lab-border bg-[#0b0d10]">
@@ -42,7 +43,7 @@ export function ModulePreview() {
               <line x1="20" y1="56" x2="280" y2="56" stroke="#2b2d31" strokeWidth="1" />
               <line x1="150" y1="18" x2="150" y2="96" stroke="#2b2d31" strokeWidth="1" />
               {layout.transforms.map((transform, transformIndex) => (
-                <ModuleGlyph key={transformIndex} transform={transform} mass={mass} carve={carve} fieldPath={fieldPath} />
+                <ModuleGlyph key={transformIndex} transform={transform} mass={mass} carve={carve} axes={axes} fieldPath={fieldPath} />
               ))}
             </svg>
           </section>
@@ -56,17 +57,27 @@ function ModuleGlyph({
   transform,
   mass,
   carve,
+  axes,
   fieldPath
 }: {
   transform: { x: number; y: number; s: number };
   mass: Bubble[];
   carve: Bubble[];
+  axes: Axis[];
   fieldPath: string;
 }) {
+  const axisNodes = axisNodesForAxes(axes);
+
   return (
     <g transform={`translate(${transform.x} ${transform.y}) scale(${transform.s}) translate(-450 -310)`}>
       <path d={fieldPath} fill="#050505" stroke="#050505" strokeLinejoin="round" strokeWidth="2" />
       <g opacity="0.4">
+        {axes.map((axis) => (
+          <line key={`axis-${axis.id}`} x1={axis.x1} y1={axis.y1} x2={axis.x2} y2={axis.y2} stroke="#f4f1e8" strokeLinecap="round" strokeWidth={Math.max(4, axis.thickness * 0.12)} />
+        ))}
+        {axisNodes.map((node) => (
+          <circle key={`node-${node.id}`} cx={node.x} cy={node.y} r={node.r} fill="none" stroke="#f4f1e8" strokeWidth="4" />
+        ))}
         {mass.slice(0, 12).map((bubble) => (
           <circle key={`m-${bubble.id}`} cx={bubble.x} cy={bubble.y} r={bubble.r} fill="none" stroke="#f4f1e8" strokeWidth="4" />
         ))}

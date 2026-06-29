@@ -19,6 +19,15 @@ export type Axis = {
   kind: "mass";
 };
 
+export type AxisNode = {
+  id: string;
+  axisId: string;
+  x: number;
+  y: number;
+  r: number;
+  role: "start" | "end";
+};
+
 export type Boundary = {
   shape: "circle" | "ellipse" | "rectangle" | "capsule";
   cx: number;

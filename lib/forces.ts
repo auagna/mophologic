@@ -1,6 +1,6 @@
 import { clampBubbleToBoundary, isInsideBoundary, VIEWBOX } from "@/lib/boundary";
 import { createSeededRandom, randomBetween } from "@/lib/seededRandom";
-import type { Axis, Boundary, Bubble, SimParams } from "@/types";
+import type { Axis, AxisNode, Boundary, Bubble, SimParams } from "@/types";
 
 export function createDefaultBoundary(): Boundary {
   return {
@@ -94,31 +94,27 @@ export function generateAxes(params: SimParams, boundary: Boundary): Axis[] {
   return axes;
 }
 
-export function axisEndpointBubbles(axes: Axis[]): Bubble[] {
-  return axes.flatMap((axis, index) => {
+export function axisNodesForAxes(axes: Axis[]): AxisNode[] {
+  return axes.flatMap((axis) => {
     const r = axis.thickness * 0.5;
     return [
       {
-        id: `${axis.id}-a`,
+        id: `${axis.id}-start`,
+        axisId: axis.id,
         x: axis.x1,
         y: axis.y1,
-        vx: 0,
-        vy: 0,
         r,
-        kind: "mass" as const,
-        fixed: true
+        role: "start" as const
       },
       {
-        id: `${axis.id}-b`,
+        id: `${axis.id}-end`,
+        axisId: axis.id,
         x: axis.x2,
         y: axis.y2,
-        vx: 0,
-        vy: 0,
         r,
-        kind: "mass" as const,
-        fixed: true
+        role: "end" as const
       }
-    ].map((bubble) => ({ ...bubble, id: `${bubble.id}-${index}` }));
+    ];
   });
 }
 

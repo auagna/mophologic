@@ -4,11 +4,11 @@ import { MouseEvent, PointerEvent, useEffect, useMemo, useRef, useState } from "
 import { Download, FileImage } from "lucide-react";
 import { boundaryPath, VIEWBOX } from "@/lib/boundary";
 import { exportPng, exportSvg } from "@/lib/svgExport";
-import { linksForBubbles } from "@/lib/forces";
+import { axisNodesForAxes, linksForBubbles } from "@/lib/forces";
 import { buildSignedFieldPath } from "@/lib/signedField";
 import { Button } from "@/components/ui/Button";
 import { useSimStore } from "@/store/useSimStore";
-import type { Bubble } from "@/types";
+import type { AxisNode, Bubble } from "@/types";
 
 export function ForceCanvas() {
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -33,6 +33,7 @@ export function ForceCanvas() {
   const massBubbles = useMemo(() => bubbles.filter((bubble) => bubble.kind === "mass"), [bubbles]);
   const carveBubbles = useMemo(() => bubbles.filter((bubble) => bubble.kind === "carve"), [bubbles]);
   const links = useMemo(() => linksForBubbles(bubbles, params), [bubbles, params]);
+  const axisNodes = useMemo(() => axisNodesForAxes(axes), [axes]);
   const fieldPath = useMemo(() => buildSignedFieldPath(bubbles, axes, boundary, params), [bubbles, axes, boundary, params]);
 
   useEffect(() => {
@@ -150,6 +151,9 @@ export function ForceCanvas() {
                   opacity="0.42"
                 />
               ))}
+              {axisNodes.map((node) => (
+                <AxisNodeGuide key={node.id} node={node} />
+              ))}
               {links.map((link) => (
                 <line key={`${link.a.id}-${link.b.id}`} x1={link.a.x} y1={link.a.y} x2={link.b.x} y2={link.b.y} stroke="#6d7480" strokeWidth="1.2" opacity={link.opacity * 0.82} />
               ))}
@@ -211,6 +215,17 @@ export function ForceCanvas() {
         </svg>
       </div>
     </section>
+  );
+}
+
+function AxisNodeGuide({ node }: { node: AxisNode }) {
+  return (
+    <g data-axis-node-id={node.id} data-axis-id={node.axisId}>
+      <circle cx={node.x} cy={node.y} r={node.r} fill="rgba(78,157,255,0.08)" stroke="#4e9dff" strokeDasharray="5 4" strokeWidth="1.7" />
+      <text x={node.x} y={node.y + 5} fill="#4e9dff" fontSize={node.r * 0.42} textAnchor="middle" pointerEvents="none" opacity="0.72">
+        +
+      </text>
+    </g>
   );
 }
 
