@@ -1,6 +1,7 @@
 "use client";
 
-import { boundaryPath } from "@/lib/boundary";
+import { useMemo } from "react";
+import { buildSignedFieldPath } from "@/lib/signedField";
 import { useSimStore } from "@/store/useSimStore";
 import type { Bubble } from "@/types";
 
@@ -21,7 +22,7 @@ export function ModulePreview() {
   const params = useSimStore((state) => state.params);
   const mass = bubbles.filter((bubble) => bubble.kind === "mass");
   const carve = bubbles.filter((bubble) => bubble.kind === "carve");
-  const path = boundaryPath(boundary);
+  const fieldPath = useMemo(() => buildSignedFieldPath(bubbles, boundary, params, { step: 8 }), [bubbles, boundary, params]);
 
   return (
     <aside className="lab-scrollbar max-h-[calc(100vh-5rem)] overflow-auto border border-lab-border bg-lab-panel shadow-panel">
@@ -37,30 +38,10 @@ export function ModulePreview() {
               <span className="text-[10px] text-lab-muted">{layout.transforms.length} mod</span>
             </div>
             <svg viewBox="0 0 300 112" className="h-[112px] w-full bg-[#11100d]">
-              <defs>
-                <clipPath id={`preview-clip-${index}`}>
-                  <path d={path} />
-                </clipPath>
-                <filter id={`preview-filter-${index}`} x="-20%" y="-20%" width="140%" height="140%" colorInterpolationFilters="sRGB">
-                  <feGaussianBlur in="SourceGraphic" stdDeviation={params.mergeBlur} result="blur" />
-                  <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -10" result="threshold" />
-                </filter>
-                <mask id={`preview-mask-${index}`} maskUnits="userSpaceOnUse" x="0" y="0" width="900" height="620">
-                  <rect width="900" height="620" fill="black" />
-                  <g clipPath={`url(#preview-clip-${index})`} filter={`url(#preview-filter-${index})`}>
-                    {mass.map((bubble) => (
-                      <circle key={bubble.id} cx={bubble.x} cy={bubble.y} r={bubble.r} fill="white" />
-                    ))}
-                  </g>
-                  {carve.map((bubble) => (
-                    <circle key={bubble.id} cx={bubble.x} cy={bubble.y} r={bubble.r} fill="black" />
-                  ))}
-                </mask>
-              </defs>
               <line x1="20" y1="56" x2="280" y2="56" stroke="#2b2d31" strokeWidth="1" />
               <line x1="150" y1="18" x2="150" y2="96" stroke="#2b2d31" strokeWidth="1" />
               {layout.transforms.map((transform, transformIndex) => (
-                <ModuleGlyph key={transformIndex} transform={transform} mass={mass} carve={carve} maskId={`preview-mask-${index}`} />
+                <ModuleGlyph key={transformIndex} transform={transform} mass={mass} carve={carve} fieldPath={fieldPath} />
               ))}
             </svg>
           </section>
@@ -74,18 +55,16 @@ function ModuleGlyph({
   transform,
   mass,
   carve,
-  maskId
+  fieldPath
 }: {
   transform: { x: number; y: number; s: number };
   mass: Bubble[];
   carve: Bubble[];
-  maskId: string;
+  fieldPath: string;
 }) {
   return (
     <g transform={`translate(${transform.x} ${transform.y}) scale(${transform.s}) translate(-450 -310)`}>
-      <g mask={`url(#${maskId})`}>
-        <rect width="900" height="620" fill="#050505" />
-      </g>
+      <path d={fieldPath} fill="#050505" />
       <g opacity="0.4">
         {mass.slice(0, 12).map((bubble) => (
           <circle key={`m-${bubble.id}`} cx={bubble.x} cy={bubble.y} r={bubble.r} fill="none" stroke="#f4f1e8" strokeWidth="4" />

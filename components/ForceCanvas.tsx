@@ -5,6 +5,7 @@ import { Download, FileImage } from "lucide-react";
 import { boundaryPath, VIEWBOX } from "@/lib/boundary";
 import { exportPng, exportSvg } from "@/lib/svgExport";
 import { linksForBubbles } from "@/lib/forces";
+import { buildSignedFieldPath } from "@/lib/signedField";
 import { Button } from "@/components/ui/Button";
 import { useSimStore } from "@/store/useSimStore";
 import type { Bubble } from "@/types";
@@ -31,6 +32,7 @@ export function ForceCanvas() {
   const massBubbles = useMemo(() => bubbles.filter((bubble) => bubble.kind === "mass"), [bubbles]);
   const carveBubbles = useMemo(() => bubbles.filter((bubble) => bubble.kind === "carve"), [bubbles]);
   const links = useMemo(() => linksForBubbles(bubbles, params), [bubbles, params]);
+  const fieldPath = useMemo(() => buildSignedFieldPath(bubbles, boundary, params), [bubbles, boundary, params]);
 
   useEffect(() => {
     function tick() {
@@ -120,21 +122,9 @@ export function ForceCanvas() {
             <clipPath id="force-boundary-clip">
               <path d={bPath} />
             </clipPath>
-            <filter id="force-metaball-filter" x="-20%" y="-20%" width="140%" height="140%" colorInterpolationFilters="sRGB">
-              <feGaussianBlur in="SourceGraphic" stdDeviation={params.mergeBlur} result="blur" />
-              <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -10" result="threshold" />
-            </filter>
-            <mask id="force-metaball-mask" maskUnits="userSpaceOnUse" x="0" y="0" width={VIEWBOX.width} height={VIEWBOX.height}>
-              <rect width={VIEWBOX.width} height={VIEWBOX.height} fill="black" />
-              <g clipPath="url(#force-boundary-clip)" filter="url(#force-metaball-filter)">
-                {massBubbles.map((bubble) => (
-                  <circle key={bubble.id} cx={bubble.x} cy={bubble.y} r={bubble.r} fill="white" />
-                ))}
-              </g>
-              {carveBubbles.map((bubble) => (
-                <circle key={bubble.id} cx={bubble.x} cy={bubble.y} r={bubble.r} fill="black" />
-              ))}
-            </mask>
+            <clipPath id="force-field-shape-clip">
+              <path d={fieldPath} />
+            </clipPath>
             <pattern id="force-grid" width="34" height="34" patternUnits="userSpaceOnUse">
               <path d="M 34 0 H 0 V 34" fill="none" stroke="#d7d2c5" strokeWidth="0.7" />
             </pattern>
@@ -153,9 +143,9 @@ export function ForceCanvas() {
           ) : null}
 
           {visual.showMergedShape || patternMode === "metaball" || patternMode === "carved" ? (
-            <g mask="url(#force-metaball-mask)">
-              <rect width={VIEWBOX.width} height={VIEWBOX.height} fill="#050505" />
-              {renderPattern(patternMode, massBubbles, links)}
+            <g clipPath="url(#force-boundary-clip)" data-signed-field-shape>
+              <path d={fieldPath} fill="#050505" fillRule="nonzero" data-field-path />
+              <g clipPath="url(#force-field-shape-clip)">{renderPattern(patternMode, massBubbles, links)}</g>
             </g>
           ) : null}
 

@@ -120,11 +120,39 @@ export function stepSimulation(bubbles: Bubble[], boundary: Boundary, params: Si
       const dx = mass.x - carve.x;
       const dy = mass.y - carve.y;
       const d = Math.max(0.01, Math.hypot(dx, dy));
-      const limit = mass.r + carve.r + params.linkDistance * 0.9;
+      const limit = mass.r + carve.r + params.linkDistance * 1.45;
       if (d > limit) continue;
-      const amount = ((limit - d) / limit) * params.repulsionStrength * 0.58;
+      const amount = ((limit - d) / limit) * params.repulsionStrength * 1.35;
       massForce.x += (dx / d) * amount;
       massForce.y += (dy / d) * amount;
+      const carveForce = forces.get(carve.id);
+      if (carveForce && !carve.fixed) {
+        carveForce.x -= (dx / d) * amount * 0.18;
+        carveForce.y -= (dy / d) * amount * 0.18;
+      }
+    }
+  }
+
+  for (let i = 0; i < carveBubbles.length; i += 1) {
+    for (let j = i + 1; j < carveBubbles.length; j += 1) {
+      const a = carveBubbles[i];
+      const b = carveBubbles[j];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const d = Math.max(0.01, Math.hypot(dx, dy));
+      const limit = a.r + b.r + params.linkDistance * 0.8;
+      if (d > limit) continue;
+      const amount = ((limit - d) / limit) * params.repulsionStrength * 0.38;
+      const aForce = forces.get(a.id);
+      const bForce = forces.get(b.id);
+      if (aForce) {
+        aForce.x -= (dx / d) * amount;
+        aForce.y -= (dy / d) * amount;
+      }
+      if (bForce) {
+        bForce.x += (dx / d) * amount;
+        bForce.y += (dy / d) * amount;
+      }
     }
   }
 
