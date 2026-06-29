@@ -87,7 +87,7 @@ function normalizeParams(params: SimParams): SimParams {
 }
 
 function normalizeColor(value: string | undefined, fallback: string) {
-  return /^#[0-9a-fA-F]{6}$/.test(value ?? "") ? value : fallback;
+  return /^#[0-9a-fA-F]{6}$/.test(value ?? "") ? value ?? fallback : fallback;
 }
 
 export const useSimStore = create<SimState>()(
