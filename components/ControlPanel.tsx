@@ -123,6 +123,10 @@ export function ControlPanel() {
         <section className="grid gap-3">
           <PanelTitle>Visual</PanelTitle>
           <Slider label="Merge Blur" value={params.mergeBlur} min={2} max={30} step={1} suffix=" px" onChange={(value) => updateParam("mergeBlur", value)} />
+          <div className="grid grid-cols-2 gap-2">
+            <ColorControl label="Bubble Surface" value={params.bubbleFillColor} onChange={(value) => updateParam("bubbleFillColor", value)} />
+            <ColorControl label="Axis Surface" value={params.axisFillColor} onChange={(value) => updateParam("axisFillColor", value)} />
+          </div>
           <SegmentedControl value={patternMode} options={patternOptions} onChange={setPatternMode} className="grid-cols-2" />
           <div className="grid grid-cols-2 gap-2">
             <Toggle active={visual.showMergedShape} onClick={() => toggleVisual("showMergedShape")}>
@@ -146,6 +150,18 @@ export function ControlPanel() {
 
 function PanelTitle({ children }: { children: string }) {
   return <h2 className="border-b border-lab-border pb-2 text-[11px] font-semibold uppercase tracking-normal text-lab-text">{children}</h2>;
+}
+
+function ColorControl({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="grid gap-1.5 text-[11px] text-lab-muted">
+      {label}
+      <span className="flex h-8 items-center gap-2 border border-lab-border bg-[#0b0d10] px-2">
+        <input type="color" value={value} onChange={(event) => onChange(event.target.value)} className="h-5 w-8 cursor-pointer border-0 bg-transparent p-0" />
+        <span className="min-w-0 flex-1 truncate text-[10px] uppercase tabular-nums text-lab-text">{value}</span>
+      </span>
+    </label>
+  );
 }
 
 function Toggle({ active, children, onClick }: { active: boolean; children: string; onClick: () => void }) {

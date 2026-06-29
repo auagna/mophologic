@@ -32,7 +32,9 @@ export function createDefaultParams(): SimParams {
     damping: 0.88,
     linkDistance: 44,
     mergeBlur: 14,
-    boundaryForce: 0.42
+    boundaryForce: 0.42,
+    bubbleFillColor: "#050505",
+    axisFillColor: "#2f7fd2"
   };
 }
 

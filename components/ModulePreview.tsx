@@ -25,6 +25,8 @@ export function ModulePreview() {
   const mass = bubbles.filter((bubble) => bubble.kind === "mass");
   const carve = bubbles.filter((bubble) => bubble.kind === "carve");
   const fieldPath = useMemo(() => buildSignedFieldPath(bubbles, axes, boundary, params, { step: 8 }), [bubbles, axes, boundary, params]);
+  const bubbleFieldPath = useMemo(() => buildSignedFieldPath(bubbles, [], boundary, params, { step: 8 }), [bubbles, boundary, params]);
+  const axisFieldPath = useMemo(() => buildSignedFieldPath(carve, axes, boundary, params, { step: 8 }), [carve, axes, boundary, params]);
 
   return (
     <aside className="lab-scrollbar max-h-[calc(100vh-5rem)] overflow-auto border border-lab-border bg-lab-panel shadow-panel">
@@ -43,7 +45,18 @@ export function ModulePreview() {
               <line x1="20" y1="56" x2="280" y2="56" stroke="#2b2d31" strokeWidth="1" />
               <line x1="150" y1="18" x2="150" y2="96" stroke="#2b2d31" strokeWidth="1" />
               {layout.transforms.map((transform, transformIndex) => (
-                <ModuleGlyph key={transformIndex} transform={transform} mass={mass} carve={carve} axes={axes} fieldPath={fieldPath} />
+                <ModuleGlyph
+                  key={transformIndex}
+                  transform={transform}
+                  mass={mass}
+                  carve={carve}
+                  axes={axes}
+                  fieldPath={fieldPath}
+                  bubbleFieldPath={bubbleFieldPath}
+                  axisFieldPath={axisFieldPath}
+                  bubbleFillColor={params.bubbleFillColor}
+                  axisFillColor={params.axisFillColor}
+                />
               ))}
             </svg>
           </section>
@@ -58,19 +71,29 @@ function ModuleGlyph({
   mass,
   carve,
   axes,
-  fieldPath
+  fieldPath,
+  bubbleFieldPath,
+  axisFieldPath,
+  bubbleFillColor,
+  axisFillColor
 }: {
   transform: { x: number; y: number; s: number };
   mass: Bubble[];
   carve: Bubble[];
   axes: Axis[];
   fieldPath: string;
+  bubbleFieldPath: string;
+  axisFieldPath: string;
+  bubbleFillColor: string;
+  axisFillColor: string;
 }) {
   const axisNodes = axisNodesForAxes(axes);
 
   return (
     <g transform={`translate(${transform.x} ${transform.y}) scale(${transform.s}) translate(-450 -310)`}>
-      <path d={fieldPath} fill="#050505" stroke="#050505" strokeLinejoin="round" strokeWidth="2" />
+      <path d={fieldPath} fill="none" stroke="none" />
+      <path d={bubbleFieldPath} fill={bubbleFillColor} stroke={bubbleFillColor} strokeLinejoin="round" strokeWidth="2" />
+      {axes.length > 0 ? <path d={axisFieldPath} fill={axisFillColor} stroke={axisFillColor} strokeLinejoin="round" strokeWidth="2" /> : null}
       <g opacity="0.4">
         {axes.map((axis) => (
           <line key={`axis-${axis.id}`} x1={axis.x1} y1={axis.y1} x2={axis.x2} y2={axis.y2} stroke="#f4f1e8" strokeLinecap="round" strokeWidth={Math.max(4, axis.thickness * 0.12)} />

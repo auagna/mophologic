@@ -56,6 +56,8 @@ export type SimParams = {
   linkDistance: number;
   mergeBlur: number;
   boundaryForce: number;
+  bubbleFillColor: string;
+  axisFillColor: string;
 };
 
 export type PatternMode = "bubble" | "network" | "metaball" | "cellular" | "ring" | "carved";

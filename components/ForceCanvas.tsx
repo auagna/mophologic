@@ -10,9 +10,14 @@ import { Button } from "@/components/ui/Button";
 import { useSimStore } from "@/store/useSimStore";
 import type { AxisNode, Bubble } from "@/types";
 
+type DragTarget =
+  | { type: "bubble"; id: string }
+  | { type: "axis-node"; axisId: string; role: AxisNode["role"] }
+  | { type: "axis"; axisId: string; lastX: number; lastY: number };
+
 export function ForceCanvas() {
   const svgRef = useRef<SVGSVGElement | null>(null);
-  const dragId = useRef<string | null>(null);
+  const dragTarget = useRef<DragTarget | null>(null);
   const frameRef = useRef<number | null>(null);
   const [frame, setFrame] = useState(0);
   const boundary = useSimStore((state) => state.boundary);
@@ -24,7 +29,10 @@ export function ForceCanvas() {
   const visual = useSimStore((state) => state.visual);
   const isPaused = useSimStore((state) => state.isPaused);
   const moveBubble = useSimStore((state) => state.moveBubble);
+  const moveAxisNode = useSimStore((state) => state.moveAxisNode);
+  const translateAxis = useSimStore((state) => state.translateAxis);
   const selectBubble = useSimStore((state) => state.selectBubble);
+  const selectAxisNode = useSimStore((state) => state.selectAxisNode);
   const toggleFixed = useSimStore((state) => state.toggleFixed);
   const addBubble = useSimStore((state) => state.addBubble);
   const deleteSelected = useSimStore((state) => state.deleteSelected);
@@ -32,9 +40,12 @@ export function ForceCanvas() {
   const bPath = useMemo(() => boundaryPath(boundary), [boundary]);
   const massBubbles = useMemo(() => bubbles.filter((bubble) => bubble.kind === "mass"), [bubbles]);
   const carveBubbles = useMemo(() => bubbles.filter((bubble) => bubble.kind === "carve"), [bubbles]);
+  const axisFieldBubbles = useMemo(() => carveBubbles.map((bubble) => ({ ...bubble, vx: 0, vy: 0 })), [carveBubbles]);
   const links = useMemo(() => linksForBubbles(bubbles, params), [bubbles, params]);
   const axisNodes = useMemo(() => axisNodesForAxes(axes), [axes]);
   const fieldPath = useMemo(() => buildSignedFieldPath(bubbles, axes, boundary, params), [bubbles, axes, boundary, params]);
+  const bubbleFieldPath = useMemo(() => buildSignedFieldPath(bubbles, [], boundary, params), [bubbles, boundary, params]);
+  const axisFieldPath = useMemo(() => buildSignedFieldPath(axisFieldBubbles, axes, boundary, params), [axisFieldBubbles, axes, boundary, params]);
 
   useEffect(() => {
     function tick() {
@@ -61,7 +72,7 @@ export function ForceCanvas() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [deleteSelected]);
 
-  const pointFromEvent = (event: MouseEvent<SVGSVGElement> | PointerEvent<SVGSVGElement>) => {
+  const pointFromEvent = (event: MouseEvent<SVGSVGElement> | PointerEvent<SVGElement>) => {
     const svg = svgRef.current;
     if (!svg) return null;
     const rect = svg.getBoundingClientRect();
@@ -72,14 +83,24 @@ export function ForceCanvas() {
   };
 
   const onPointerMove = (event: PointerEvent<SVGSVGElement>) => {
-    if (!dragId.current) return;
+    const target = dragTarget.current;
+    if (!target) return;
     const point = pointFromEvent(event);
     if (!point) return;
-    moveBubble(dragId.current, point.x, point.y);
+    if (target.type === "bubble") {
+      moveBubble(target.id, point.x, point.y);
+      return;
+    }
+    if (target.type === "axis") {
+      translateAxis(target.axisId, point.x - target.lastX, point.y - target.lastY);
+      dragTarget.current = { ...target, lastX: point.x, lastY: point.y };
+      return;
+    }
+    moveAxisNode(target.axisId, target.role, point.x, point.y);
   };
 
   const onPointerUp = () => {
-    dragId.current = null;
+    dragTarget.current = null;
   };
 
   const onDoubleClick = (event: MouseEvent<SVGSVGElement>) => {
@@ -139,20 +160,50 @@ export function ForceCanvas() {
           {visual.showLinks || patternMode === "network" ? (
             <g clipPath="url(#force-boundary-clip)">
               {axes.map((axis) => (
-                <line
-                  key={axis.id}
-                  x1={axis.x1}
-                  y1={axis.y1}
-                  x2={axis.x2}
-                  y2={axis.y2}
-                  stroke="#4e9dff"
-                  strokeLinecap="round"
-                  strokeWidth={Math.max(2, axis.thickness * 0.08)}
-                  opacity="0.42"
-                />
+                <g key={axis.id} data-axis-id={axis.id}>
+                  <line
+                    x1={axis.x1}
+                    y1={axis.y1}
+                    x2={axis.x2}
+                    y2={axis.y2}
+                    stroke={selectedId === axis.id ? "#ffffff" : "#4e9dff"}
+                    strokeLinecap="round"
+                    strokeWidth={Math.max(2, axis.thickness * 0.08)}
+                    opacity="0.42"
+                  />
+                  <line
+                    x1={axis.x1}
+                    y1={axis.y1}
+                    x2={axis.x2}
+                    y2={axis.y2}
+                    stroke="transparent"
+                    strokeLinecap="round"
+                    strokeWidth={Math.max(16, axis.thickness * 0.48)}
+                    pointerEvents="stroke"
+                    className="cursor-grab active:cursor-grabbing"
+                    onPointerDown={(event) => {
+                      const point = pointFromEvent(event);
+                      if (!point) return;
+                      event.stopPropagation();
+                      selectAxisNode(axis.id);
+                      dragTarget.current = { type: "axis", axisId: axis.id, lastX: point.x, lastY: point.y };
+                      event.currentTarget.setPointerCapture(event.pointerId);
+                    }}
+                  />
+                </g>
               ))}
               {axisNodes.map((node) => (
-                <AxisNodeGuide key={node.id} node={node} />
+                <AxisNodeGuide
+                  key={node.id}
+                  node={node}
+                  selected={node.id === selectedId}
+                  onPointerDown={(event) => {
+                    event.stopPropagation();
+                    selectAxisNode(node.id);
+                    dragTarget.current = { type: "axis-node", axisId: node.axisId, role: node.role };
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                  }}
+                />
               ))}
               {links.map((link) => (
                 <line key={`${link.a.id}-${link.b.id}`} x1={link.a.x} y1={link.a.y} x2={link.b.x} y2={link.b.y} stroke="#6d7480" strokeWidth="1.2" opacity={link.opacity * 0.82} />
@@ -162,7 +213,11 @@ export function ForceCanvas() {
 
           {visual.showMergedShape || patternMode === "metaball" || patternMode === "carved" ? (
             <g clipPath="url(#force-boundary-clip)" data-signed-field-shape>
-              <path d={fieldPath} fill="#050505" stroke="#050505" strokeLinejoin="round" strokeWidth="1.4" fillRule="nonzero" data-field-path />
+              <path d={fieldPath} fill="none" stroke="none" data-field-path />
+              <path d={bubbleFieldPath} fill={params.bubbleFillColor} stroke={params.bubbleFillColor} strokeLinejoin="round" strokeWidth="1.4" fillRule="nonzero" data-bubble-field-path />
+              {axes.length > 0 ? (
+                <path d={axisFieldPath} fill={params.axisFillColor} stroke={params.axisFillColor} strokeLinejoin="round" strokeWidth="1.4" fillRule="nonzero" data-axis-field-path />
+              ) : null}
               <g clipPath="url(#force-field-shape-clip)">{renderPattern(patternMode, massBubbles, links)}</g>
             </g>
           ) : null}
@@ -181,7 +236,7 @@ export function ForceCanvas() {
                       toggleFixed(bubble.id);
                       return;
                     }
-                    dragId.current = bubble.id;
+                    dragTarget.current = { type: "bubble", id: bubble.id };
                     event.currentTarget.setPointerCapture(event.pointerId);
                   }}
                 />
@@ -203,7 +258,7 @@ export function ForceCanvas() {
                       toggleFixed(bubble.id);
                       return;
                     }
-                    dragId.current = bubble.id;
+                    dragTarget.current = { type: "bubble", id: bubble.id };
                     event.currentTarget.setPointerCapture(event.pointerId);
                   }}
                 />
@@ -218,10 +273,28 @@ export function ForceCanvas() {
   );
 }
 
-function AxisNodeGuide({ node }: { node: AxisNode }) {
+function AxisNodeGuide({
+  node,
+  selected,
+  onPointerDown
+}: {
+  node: AxisNode;
+  selected: boolean;
+  onPointerDown: (event: PointerEvent<SVGCircleElement>) => void;
+}) {
   return (
     <g data-axis-node-id={node.id} data-axis-id={node.axisId}>
-      <circle cx={node.x} cy={node.y} r={node.r} fill="rgba(78,157,255,0.08)" stroke="#4e9dff" strokeDasharray="5 4" strokeWidth="1.7" />
+      <circle
+        cx={node.x}
+        cy={node.y}
+        r={node.r}
+        fill="rgba(78,157,255,0.08)"
+        stroke={selected ? "#ffffff" : "#4e9dff"}
+        strokeDasharray="5 4"
+        strokeWidth={selected ? 3 : 1.7}
+        className="cursor-grab active:cursor-grabbing"
+        onPointerDown={onPointerDown}
+      />
       <text x={node.x} y={node.y + 5} fill="#4e9dff" fontSize={node.r * 0.42} textAnchor="middle" pointerEvents="none" opacity="0.72">
         +
       </text>

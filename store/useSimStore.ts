@@ -32,7 +32,10 @@ type SimState = {
   setPaused: (isPaused: boolean) => void;
   step: () => void;
   selectBubble: (id: string | null) => void;
+  selectAxisNode: (id: string | null) => void;
   moveBubble: (id: string, x: number, y: number) => void;
+  moveAxisNode: (axisId: string, role: "start" | "end", x: number, y: number) => void;
+  translateAxis: (axisId: string, dx: number, dy: number) => void;
   toggleFixed: (id: string) => void;
   addBubble: (kind: Bubble["kind"], x: number, y: number) => void;
   deleteSelected: () => void;
@@ -77,8 +80,14 @@ function normalizeParams(params: SimParams): SimParams {
     carveMinRadius: Math.min(params.carveMinRadius ?? initialParams.carveMinRadius, params.carveMaxRadius ?? initialParams.carveMaxRadius),
     carveMaxRadius: Math.max(params.carveMaxRadius ?? initialParams.carveMaxRadius, params.carveMinRadius ?? initialParams.carveMinRadius),
     minRadius: Math.min(params.minRadius ?? initialParams.minRadius, params.maxRadius ?? initialParams.maxRadius),
-    maxRadius: Math.max(params.maxRadius ?? initialParams.maxRadius, params.minRadius ?? initialParams.minRadius)
+    maxRadius: Math.max(params.maxRadius ?? initialParams.maxRadius, params.minRadius ?? initialParams.minRadius),
+    bubbleFillColor: normalizeColor(params.bubbleFillColor, initialParams.bubbleFillColor),
+    axisFillColor: normalizeColor(params.axisFillColor, initialParams.axisFillColor)
   };
+}
+
+function normalizeColor(value: string | undefined, fallback: string) {
+  return /^#[0-9a-fA-F]{6}$/.test(value ?? "") ? value : fallback;
 }
 
 export const useSimStore = create<SimState>()(
@@ -144,11 +153,42 @@ export const useSimStore = create<SimState>()(
           return { bubbles: stepSimulation(state.bubbles, state.boundary, state.params) };
         }),
       selectBubble: (selectedId) => set({ selectedId }),
+      selectAxisNode: (selectedId) => set({ selectedId }),
       moveBubble: (id, x, y) =>
         set((state) => ({
           bubbles: state.bubbles.map((bubble) => {
             if (bubble.id !== id) return bubble;
             return clampBubbleToBoundary({ ...bubble, x, y, vx: 0, vy: 0 }, state.boundary);
+          })
+        })),
+      moveAxisNode: (axisId, role, x, y) =>
+        set((state) => ({
+          axes: state.axes.map((axis) => {
+            if (axis.id !== axisId) return axis;
+            const r = axis.thickness / 2;
+            const clamped = clampBubbleToBoundary(
+              {
+                id: `${axis.id}-${role}`,
+                x,
+                y,
+                vx: 0,
+                vy: 0,
+                r,
+                kind: "mass"
+              },
+              state.boundary
+            );
+            return role === "start" ? { ...axis, x1: clamped.x, y1: clamped.y } : { ...axis, x2: clamped.x, y2: clamped.y };
+          })
+        })),
+      translateAxis: (axisId, dx, dy) =>
+        set((state) => ({
+          axes: state.axes.map((axis) => {
+            if (axis.id !== axisId) return axis;
+            const r = axis.thickness / 2;
+            const start = clampBubbleToBoundary({ id: `${axis.id}-start`, x: axis.x1 + dx, y: axis.y1 + dy, vx: 0, vy: 0, r, kind: "mass" }, state.boundary);
+            const end = clampBubbleToBoundary({ id: `${axis.id}-end`, x: axis.x2 + dx, y: axis.y2 + dy, vx: 0, vy: 0, r, kind: "mass" }, state.boundary);
+            return { ...axis, x1: start.x, y1: start.y, x2: end.x, y2: end.y };
           })
         })),
       toggleFixed: (id) =>
