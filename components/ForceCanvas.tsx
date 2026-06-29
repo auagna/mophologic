@@ -266,7 +266,7 @@ export function ForceCanvas() {
             </g>
           ) : null}
 
-          {visual.showLinks || patternMode === "network" ? (
+          {axes.length > 0 ? (
             <g clipPath="url(#force-boundary-clip)" data-axis-control-layer>
               {axes.map((axis) => (
                 <g key={`control-${axis.id}`} data-axis-id={axis.id}>
@@ -340,6 +340,7 @@ function AxisNodeGuide({
         cy={node.y}
         r={Math.max(14, node.r * 0.7)}
         fill="transparent"
+        pointerEvents="all"
         className="cursor-grab active:cursor-grabbing"
         onPointerDown={onPointerDown}
       />
@@ -351,6 +352,7 @@ function AxisNodeGuide({
         stroke={selected ? "#ffffff" : "#4e9dff"}
         strokeDasharray="5 4"
         strokeWidth={selected ? 3 : 1.7}
+        pointerEvents="all"
         className="cursor-grab active:cursor-grabbing"
         onPointerDown={onPointerDown}
       />
