@@ -222,6 +222,45 @@ export function ForceCanvas() {
             </g>
           ) : null}
 
+          {axes.length > 0 ? (
+            <g clipPath="url(#force-boundary-clip)" data-axis-line-control-layer>
+              {axes.map((axis) => (
+                <g key={`control-${axis.id}`} data-axis-id={axis.id}>
+                  <line
+                    x1={axis.x1}
+                    y1={axis.y1}
+                    x2={axis.x2}
+                    y2={axis.y2}
+                    stroke={selectedId === axis.id ? "#ffffff" : "#4e9dff"}
+                    strokeLinecap="round"
+                    strokeWidth={Math.max(2, axis.thickness * 0.1)}
+                    opacity="0.62"
+                    pointerEvents="none"
+                  />
+                  <line
+                    x1={axis.x1}
+                    y1={axis.y1}
+                    x2={axis.x2}
+                    y2={axis.y2}
+                    stroke="transparent"
+                    strokeLinecap="round"
+                    strokeWidth={Math.max(8, axis.thickness * 0.24)}
+                    pointerEvents="stroke"
+                    className="cursor-grab active:cursor-grabbing"
+                    onPointerDown={(event) => {
+                      const point = pointFromEvent(event);
+                      if (!point) return;
+                      event.stopPropagation();
+                      selectAxisNode(axis.id);
+                      dragTarget.current = { type: "axis", axisId: axis.id, lastX: point.x, lastY: point.y };
+                      event.currentTarget.setPointerCapture(event.pointerId);
+                    }}
+                  />
+                </g>
+              ))}
+            </g>
+          ) : null}
+
           {visual.showBubbles || patternMode === "bubble" || patternMode === "ring" ? (
             <g>
               {massBubbles.map((bubble) => (
@@ -268,39 +307,6 @@ export function ForceCanvas() {
 
           {axes.length > 0 ? (
             <g clipPath="url(#force-boundary-clip)" data-axis-control-layer>
-              {axes.map((axis) => (
-                <g key={`control-${axis.id}`} data-axis-id={axis.id}>
-                  <line
-                    x1={axis.x1}
-                    y1={axis.y1}
-                    x2={axis.x2}
-                    y2={axis.y2}
-                    stroke={selectedId === axis.id ? "#ffffff" : "#4e9dff"}
-                    strokeLinecap="round"
-                    strokeWidth={Math.max(2, axis.thickness * 0.1)}
-                    opacity="0.62"
-                  />
-                  <line
-                    x1={axis.x1}
-                    y1={axis.y1}
-                    x2={axis.x2}
-                    y2={axis.y2}
-                    stroke="transparent"
-                    strokeLinecap="round"
-                    strokeWidth={Math.max(20, axis.thickness * 0.62)}
-                    pointerEvents="stroke"
-                    className="cursor-grab active:cursor-grabbing"
-                    onPointerDown={(event) => {
-                      const point = pointFromEvent(event);
-                      if (!point) return;
-                      event.stopPropagation();
-                      selectAxisNode(axis.id);
-                      dragTarget.current = { type: "axis", axisId: axis.id, lastX: point.x, lastY: point.y };
-                      event.currentTarget.setPointerCapture(event.pointerId);
-                    }}
-                  />
-                </g>
-              ))}
               {axisNodes.map((node) => (
                 <AxisNodeGuide
                   key={node.id}
