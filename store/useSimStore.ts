@@ -81,13 +81,21 @@ function normalizeParams(params: SimParams): SimParams {
     carveMaxRadius: Math.max(params.carveMaxRadius ?? initialParams.carveMaxRadius, params.carveMinRadius ?? initialParams.carveMinRadius),
     minRadius: Math.min(params.minRadius ?? initialParams.minRadius, params.maxRadius ?? initialParams.maxRadius),
     maxRadius: Math.max(params.maxRadius ?? initialParams.maxRadius, params.minRadius ?? initialParams.minRadius),
+    surfaceMode: params.surfaceMode === "separate" ? "separate" : "merge",
     bubbleFillColor: normalizeColor(params.bubbleFillColor, initialParams.bubbleFillColor),
-    axisFillColor: normalizeColor(params.axisFillColor, initialParams.axisFillColor)
+    axisFillColor: normalizeColor(params.axisFillColor, initialParams.axisFillColor),
+    moduleColumns: clampInteger(params.moduleColumns, 1, 8, initialParams.moduleColumns),
+    moduleRows: clampInteger(params.moduleRows, 1, 6, initialParams.moduleRows)
   };
 }
 
 function normalizeColor(value: string | undefined, fallback: string) {
   return /^#[0-9a-fA-F]{6}$/.test(value ?? "") ? value ?? fallback : fallback;
+}
+
+function clampInteger(value: number | undefined, min: number, max: number, fallback: number) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(value)));
 }
 
 export const useSimStore = create<SimState>()(

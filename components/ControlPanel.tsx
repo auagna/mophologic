@@ -29,6 +29,11 @@ const generationOptions: Array<{ value: SimParams["generationMode"]; label: stri
   { value: "hybrid", label: "Hybrid" }
 ];
 
+const surfaceOptions: Array<{ value: SimParams["surfaceMode"]; label: string }> = [
+  { value: "merge", label: "Merge" },
+  { value: "separate", label: "Separate" }
+];
+
 export function ControlPanel() {
   const boundary = useSimStore((state) => state.boundary);
   const params = useSimStore((state) => state.params);
@@ -70,7 +75,7 @@ export function ControlPanel() {
             </Button>
           </div>
           <label className="grid gap-1.5 text-[11px] text-lab-muted">
-            Seed
+            Variant Seed
             <input
               type="number"
               value={params.seed}
@@ -123,9 +128,15 @@ export function ControlPanel() {
         <section className="grid gap-3">
           <PanelTitle>Visual</PanelTitle>
           <Slider label="Merge Blur" value={params.mergeBlur} min={2} max={30} step={1} suffix=" px" onChange={(value) => updateParam("mergeBlur", value)} />
+          <SegmentedControl value={params.surfaceMode} options={surfaceOptions} onChange={(value) => updateParam("surfaceMode", value)} className="grid-cols-2" />
           <div className="grid grid-cols-2 gap-2">
             <ColorControl label="Bubble Surface" value={params.bubbleFillColor} onChange={(value) => updateParam("bubbleFillColor", value)} />
-            <ColorControl label="Axis Surface" value={params.axisFillColor} onChange={(value) => updateParam("axisFillColor", value)} />
+            <ColorControl
+              label="Axis Surface"
+              value={params.surfaceMode === "merge" ? params.bubbleFillColor : params.axisFillColor}
+              disabled={params.surfaceMode === "merge"}
+              onChange={(value) => updateParam("axisFillColor", value)}
+            />
           </div>
           <SegmentedControl value={patternMode} options={patternOptions} onChange={setPatternMode} className="grid-cols-2" />
           <div className="grid grid-cols-2 gap-2">
@@ -143,6 +154,12 @@ export function ControlPanel() {
             </Toggle>
           </div>
         </section>
+
+        <section className="grid gap-3">
+          <PanelTitle>Module Split</PanelTitle>
+          <Slider label="Columns" value={params.moduleColumns} min={1} max={8} step={1} onChange={(value) => updateParam("moduleColumns", value)} />
+          <Slider label="Rows" value={params.moduleRows} min={1} max={6} step={1} onChange={(value) => updateParam("moduleRows", value)} />
+        </section>
       </div>
     </aside>
   );
@@ -152,7 +169,7 @@ function PanelTitle({ children }: { children: string }) {
   return <h2 className="border-b border-lab-border pb-2 text-[11px] font-semibold uppercase tracking-normal text-lab-text">{children}</h2>;
 }
 
-function ColorControl({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function ColorControl({ label, value, disabled, onChange }: { label: string; value: string; disabled?: boolean; onChange: (value: string) => void }) {
   return (
     <label className="grid gap-1.5 text-[11px] text-lab-muted">
       {label}
@@ -161,9 +178,10 @@ function ColorControl({ label, value, onChange }: { label: string; value: string
           type="color"
           aria-label={label}
           value={value}
+          disabled={disabled}
           onInput={(event) => onChange(event.currentTarget.value)}
           onChange={(event) => onChange(event.currentTarget.value)}
-          className="h-5 w-8 cursor-pointer border-0 bg-transparent p-0"
+          className="h-5 w-8 cursor-pointer border-0 bg-transparent p-0 disabled:cursor-default disabled:opacity-45"
         />
         <span className="min-w-0 flex-1 truncate text-[10px] uppercase tabular-nums text-lab-text">{value}</span>
       </span>

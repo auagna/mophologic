@@ -33,8 +33,11 @@ export function createDefaultParams(): SimParams {
     linkDistance: 44,
     mergeBlur: 14,
     boundaryForce: 0.42,
+    surfaceMode: "merge",
     bubbleFillColor: "#050505",
-    axisFillColor: "#2f7fd2"
+    axisFillColor: "#2f7fd2",
+    moduleColumns: 3,
+    moduleRows: 2
   };
 }
 
