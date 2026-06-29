@@ -194,6 +194,16 @@ export function ForceCanvas() {
               ) : (
                 <>
                   <path d={fieldPath} fill="none" stroke="none" pointerEvents="none" data-field-path />
+                  <path
+                    d={bubbleFieldPath}
+                    fill={params.bubbleFillColor}
+                    stroke={params.bubbleFillColor}
+                    strokeLinejoin="round"
+                    strokeWidth="1.4"
+                    fillRule="nonzero"
+                    pointerEvents="none"
+                    data-bubble-field-path
+                  />
                   {axes.length > 0 ? (
                     <path
                       d={axisFieldPath}
@@ -206,16 +216,6 @@ export function ForceCanvas() {
                       data-axis-field-path
                     />
                   ) : null}
-                  <path
-                    d={bubbleFieldPath}
-                    fill={params.bubbleFillColor}
-                    stroke={params.bubbleFillColor}
-                    strokeLinejoin="round"
-                    strokeWidth="1.4"
-                    fillRule="nonzero"
-                    pointerEvents="none"
-                    data-bubble-field-path
-                  />
                 </>
               )}
               <g clipPath="url(#force-field-shape-clip)">{renderPattern(patternMode, massBubbles, links)}</g>

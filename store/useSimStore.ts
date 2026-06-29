@@ -56,23 +56,6 @@ function regenerate(params: SimParams, boundary: Boundary) {
   };
 }
 
-function changesBubblePopulation(key: keyof SimParams) {
-  return [
-    "seed",
-    "generationMode",
-    "bubbleCount",
-    "minRadius",
-    "maxRadius",
-    "carveCount",
-    "carveMinRadius",
-    "carveMaxRadius",
-    "axisCount",
-    "axisLength",
-    "axisAngle",
-    "axisThickness"
-  ].includes(key);
-}
-
 function normalizeParams(params: SimParams): SimParams {
   return {
     ...initialParams,
@@ -96,6 +79,82 @@ function normalizeColor(value: string | undefined, fallback: string) {
 function clampInteger(value: number | undefined, min: number, max: number, fallback: number) {
   if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
   return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+function shouldRegenerateForParam(key: keyof SimParams) {
+  return key === "seed" || key === "generationMode";
+}
+
+function shouldReconcileGeometryForParam(key: keyof SimParams) {
+  return [
+    "bubbleCount",
+    "minRadius",
+    "maxRadius",
+    "carveCount",
+    "carveMinRadius",
+    "carveMaxRadius",
+    "axisCount",
+    "axisLength",
+    "axisAngle",
+    "axisThickness"
+  ].includes(key);
+}
+
+function reconcileBubbles(current: Bubble[], params: SimParams, boundary: Boundary) {
+  const generated = generateBubbles(params, boundary);
+  const desiredMassCount = params.generationMode === "axis" ? 0 : params.bubbleCount;
+  const desiredCarveCount = params.carveCount;
+  const currentMass = current.filter((bubble) => bubble.kind === "mass");
+  const currentCarve = current.filter((bubble) => bubble.kind === "carve");
+  const generatedMass = generated.filter((bubble) => bubble.kind === "mass");
+  const generatedCarve = generated.filter((bubble) => bubble.kind === "carve");
+  const mass = reconcileBubbleKind(currentMass, generatedMass, desiredMassCount, params, boundary, "mass");
+  const carve = reconcileBubbleKind(currentCarve, generatedCarve, desiredCarveCount, params, boundary, "carve");
+  return [...mass, ...carve];
+}
+
+function reconcileBubbleKind(current: Bubble[], generated: Bubble[], count: number, params: SimParams, boundary: Boundary, kind: Bubble["kind"]) {
+  const kept = current.slice(0, count).map((bubble) => resizeBubble(bubble, params, boundary));
+  if (kept.length >= count) return kept;
+  return [...kept, ...generated.slice(kept.length, count).map((bubble) => resizeBubble({ ...bubble, kind }, params, boundary))];
+}
+
+function resizeBubble(bubble: Bubble, params: SimParams, boundary: Boundary) {
+  const min = bubble.kind === "mass" ? params.minRadius : params.carveMinRadius;
+  const max = bubble.kind === "mass" ? params.maxRadius : params.carveMaxRadius;
+  return clampBubbleToBoundary({ ...bubble, r: Math.min(max, Math.max(min, bubble.r)), vx: 0, vy: 0 }, boundary);
+}
+
+function reconcileAxes(current: Axis[], params: SimParams, previousParams: SimParams, boundary: Boundary) {
+  if (params.generationMode === "bubble") return [];
+
+  const generated = generateAxes(params, boundary);
+  const desiredCount = params.axisCount;
+  const kept = current.slice(0, desiredCount).map((axis) => resizeAxis(axis, params, previousParams, boundary));
+  if (kept.length >= desiredCount) return kept;
+  return [...kept, ...generated.slice(kept.length, desiredCount)];
+}
+
+function resizeAxis(axis: Axis, params: SimParams, previousParams: SimParams, boundary: Boundary) {
+  const centerX = (axis.x1 + axis.x2) / 2;
+  const centerY = (axis.y1 + axis.y2) / 2;
+  const lengthRatio = safeRatio(params.axisLength, previousParams.axisLength);
+  const thicknessRatio = safeRatio(params.axisThickness, previousParams.axisThickness);
+  const angleDelta = ((params.axisAngle - previousParams.axisAngle) * Math.PI) / 180;
+  const halfX = ((axis.x2 - axis.x1) / 2) * lengthRatio;
+  const halfY = ((axis.y2 - axis.y1) / 2) * lengthRatio;
+  const dx = Math.cos(angleDelta) * halfX - Math.sin(angleDelta) * halfY;
+  const dy = Math.sin(angleDelta) * halfX + Math.cos(angleDelta) * halfY;
+  const thickness = Math.max(1, axis.thickness * thicknessRatio);
+  const r = thickness / 2;
+  const start = clampBubbleToBoundary({ id: `${axis.id}-start`, x: centerX - dx, y: centerY - dy, vx: 0, vy: 0, r, kind: "mass" }, boundary);
+  const end = clampBubbleToBoundary({ id: `${axis.id}-end`, x: centerX + dx, y: centerY + dy, vx: 0, vy: 0, r, kind: "mass" }, boundary);
+  return { ...axis, x1: start.x, y1: start.y, x2: end.x, y2: end.y, thickness };
+}
+
+function safeRatio(next: number, previous: number) {
+  if (!Number.isFinite(next) || !Number.isFinite(previous) || previous === 0) return 1;
+  return next / previous;
 }
 
 export const useSimStore = create<SimState>()(
@@ -129,11 +188,18 @@ export const useSimStore = create<SimState>()(
       updateParam: (key, value) =>
         set((state) => {
           const params = normalizeParams({ ...state.params, [key]: value });
-          if (changesBubblePopulation(key)) {
+          if (shouldRegenerateForParam(key)) {
             const generated = regenerate(params, state.boundary);
             return { params: generated.params, bubbles: generated.bubbles, axes: generated.axes, selectedId: null };
           }
-          return { params };
+          if (!shouldReconcileGeometryForParam(key)) {
+            return { params };
+          }
+          return {
+            params,
+            bubbles: reconcileBubbles(state.bubbles, params, state.boundary),
+            axes: reconcileAxes(state.axes, params, state.params, state.boundary)
+          };
         }),
       setPatternMode: (patternMode) => set({ patternMode }),
       toggleVisual: (key) => set((state) => ({ visual: { ...state.visual, [key]: !state.visual[key] } })),
