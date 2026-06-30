@@ -317,6 +317,12 @@ export function ForceCanvas() {
             </g>
           ) : null}
 
+          <g data-carve-guide-layer pointerEvents="none">
+            {carveBubbles.map((bubble) => (
+              <CarveBubbleGuide key={`carve-guide-${bubble.id}`} bubble={bubble} selected={bubble.id === selectedId} />
+            ))}
+          </g>
+
           <g data-bubble-control-layer>
             {bubbles.map((bubble) => (
               <BubbleHandle
@@ -393,6 +399,26 @@ function DesignGrid({ boundary, columns, rows }: { boundary: { cx: number; cy: n
       {horizontals.map((y, index) => (
         <line key={`h-${index}`} x1={left} y1={y} x2={left + width} y2={y} stroke="#9b9386" strokeWidth="0.9" opacity={index === 0 || index === safeRows ? 0.32 : 0.22} />
       ))}
+    </g>
+  );
+}
+
+function CarveBubbleGuide({ bubble, selected }: { bubble: Bubble; selected: boolean }) {
+  return (
+    <g data-carve-guide-id={bubble.id}>
+      <circle
+        cx={bubble.x}
+        cy={bubble.y}
+        r={bubble.r}
+        fill="rgba(255,255,255,0.18)"
+        stroke={selected ? "#14110d" : "#6f675d"}
+        strokeDasharray={bubble.fixed ? "6 4" : "4 3"}
+        strokeWidth={selected ? 2.6 : 1.7}
+        opacity="0.92"
+      />
+      <text x={bubble.x} y={bubble.y + 5} fill="#3f382f" fontSize={Math.max(10, bubble.r * 0.5)} textAnchor="middle" opacity="0.82">
+        -
+      </text>
     </g>
   );
 }
