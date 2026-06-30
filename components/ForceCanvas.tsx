@@ -39,6 +39,7 @@ export function ForceCanvas() {
   const bPath = useMemo(() => boundaryPath(boundary), [boundary]);
   const massBubbles = useMemo(() => bubbles.filter((bubble) => bubble.kind === "mass"), [bubbles]);
   const carveBubbles = useMemo(() => bubbles.filter((bubble) => bubble.kind === "carve"), [bubbles]);
+  const selectedBubble = useMemo(() => bubbles.find((bubble) => bubble.id === selectedId) ?? null, [bubbles, selectedId]);
   const axisFieldBubbles = useMemo(() => carveBubbles.map((bubble) => ({ ...bubble, vx: 0, vy: 0 })), [carveBubbles]);
   const links = useMemo(() => linksForBubbles(bubbles, params), [bubbles, params]);
   const axisNodes = useMemo(() => axisNodesForAxes(axes), [axes]);
@@ -336,6 +337,8 @@ export function ForceCanvas() {
             ))}
           </g>
 
+          {selectedBubble ? <SelectedBubbleGuide bubble={selectedBubble} /> : null}
+
           {axes.length > 0 ? (
             <g clipPath="url(#force-boundary-clip)" data-axis-control-layer>
               {axisNodes.map((node) => (
@@ -409,6 +412,28 @@ function BubbleHandle({ bubble, onPointerDown }: { bubble: Bubble; onPointerDown
   );
 }
 
+function SelectedBubbleGuide({ bubble }: { bubble: Bubble }) {
+  const isCarve = bubble.kind === "carve";
+  return (
+    <g data-selected-bubble-guide={bubble.id} pointerEvents="none">
+      <circle cx={bubble.x} cy={bubble.y} r={bubble.r} fill="none" stroke={isCarve ? "#16120d" : "#07101d"} strokeWidth="4.4" opacity="0.72" />
+      <circle cx={bubble.x} cy={bubble.y} r={bubble.r} fill="none" stroke={isCarve ? "#f8f4ea" : "#7db7ff"} strokeDasharray="7 4" strokeWidth="2.2" />
+      <text
+        x={bubble.x}
+        y={bubble.y + 5}
+        fill={isCarve ? "#16120d" : "#4e9dff"}
+        stroke={isCarve ? "#f8f4ea" : "none"}
+        strokeWidth={isCarve ? 0.8 : 0}
+        fontSize={bubble.r * 0.44}
+        textAnchor="middle"
+        opacity="0.95"
+      >
+        {isCarve ? "-" : "+"}
+      </text>
+    </g>
+  );
+}
+
 function AxisNodeGuide({
   node,
   selected,
@@ -468,7 +493,7 @@ function BubbleCircle({
         cy={bubble.y}
         r={bubble.r}
         fill={isCarve ? "rgba(255,255,255,0.46)" : "rgba(78,157,255,0.13)"}
-        stroke={selected ? "#ffffff" : isCarve ? "#f2efe5" : bubble.fixed ? "#2f7fd2" : "#4e9dff"}
+        stroke={selected ? (isCarve ? "#9b9386" : "#ffffff") : isCarve ? "#9b9386" : bubble.fixed ? "#2f7fd2" : "#4e9dff"}
         strokeDasharray={bubble.fixed ? "6 4" : undefined}
         strokeWidth={selected ? 3 : 1.6}
         className={bubble.fixed ? "cursor-default" : "cursor-grab active:cursor-grabbing"}
