@@ -106,7 +106,7 @@ function shouldReconcileGeometryForParam(key: keyof SimParams) {
   ].includes(key);
 }
 
-function reconcileBubbles(current: Bubble[], params: SimParams, boundary: Boundary) {
+function reconcileBubbles(current: Bubble[], params: SimParams, previousParams: SimParams, boundary: Boundary) {
   const generated = generateBubbles(params, boundary);
   const desiredMassCount = params.generationMode === "axis" ? 0 : params.bubbleCount;
   const desiredCarveCount = params.carveCount;
@@ -114,21 +114,33 @@ function reconcileBubbles(current: Bubble[], params: SimParams, boundary: Bounda
   const currentCarve = current.filter((bubble) => bubble.kind === "carve");
   const generatedMass = generated.filter((bubble) => bubble.kind === "mass");
   const generatedCarve = generated.filter((bubble) => bubble.kind === "carve");
-  const mass = reconcileBubbleKind(currentMass, generatedMass, desiredMassCount, params, boundary, "mass");
-  const carve = reconcileBubbleKind(currentCarve, generatedCarve, desiredCarveCount, params, boundary, "carve");
+  const mass = reconcileBubbleKind(currentMass, generatedMass, desiredMassCount, params, previousParams, boundary, "mass");
+  const carve = reconcileBubbleKind(currentCarve, generatedCarve, desiredCarveCount, params, previousParams, boundary, "carve");
   return [...mass, ...carve];
 }
 
-function reconcileBubbleKind(current: Bubble[], generated: Bubble[], count: number, params: SimParams, boundary: Boundary, kind: Bubble["kind"]) {
-  const kept = current.slice(0, count).map((bubble) => resizeBubble(bubble, params, boundary));
+function reconcileBubbleKind(current: Bubble[], generated: Bubble[], count: number, params: SimParams, previousParams: SimParams, boundary: Boundary, kind: Bubble["kind"]) {
+  const kept = current.slice(0, count).map((bubble) => resizeBubble(bubble, params, previousParams, boundary));
   if (kept.length >= count) return kept;
-  return [...kept, ...generated.slice(kept.length, count).map((bubble) => resizeBubble({ ...bubble, kind }, params, boundary))];
+  return [...kept, ...generated.slice(kept.length, count).map((bubble) => clampBubbleToRadiusRange({ ...bubble, kind }, params, boundary))];
 }
 
-function resizeBubble(bubble: Bubble, params: SimParams, boundary: Boundary) {
-  const min = bubble.kind === "mass" ? params.minRadius : params.carveMinRadius;
-  const max = bubble.kind === "mass" ? params.maxRadius : params.carveMaxRadius;
-  return clampBubbleToBoundary({ ...bubble, r: Math.min(max, Math.max(min, bubble.r)), vx: 0, vy: 0 }, boundary);
+function resizeBubble(bubble: Bubble, params: SimParams, previousParams: SimParams, boundary: Boundary) {
+  const next = radiusRangeForKind(bubble.kind, params);
+  const previous = radiusRangeForKind(bubble.kind, previousParams);
+  const t = previous.max === previous.min ? 0.5 : Math.min(1, Math.max(0, (bubble.r - previous.min) / (previous.max - previous.min)));
+  return clampBubbleToBoundary({ ...bubble, r: next.min + (next.max - next.min) * t, vx: 0, vy: 0 }, boundary);
+}
+
+function clampBubbleToRadiusRange(bubble: Bubble, params: SimParams, boundary: Boundary) {
+  const range = radiusRangeForKind(bubble.kind, params);
+  return clampBubbleToBoundary({ ...bubble, r: Math.min(range.max, Math.max(range.min, bubble.r)), vx: 0, vy: 0 }, boundary);
+}
+
+function radiusRangeForKind(kind: Bubble["kind"], params: SimParams) {
+  return kind === "mass"
+    ? { min: params.minRadius, max: params.maxRadius }
+    : { min: params.carveMinRadius, max: params.carveMaxRadius };
 }
 
 function reconcileAxes(current: Axis[], params: SimParams, previousParams: SimParams, boundary: Boundary) {
@@ -236,7 +248,7 @@ export const useSimStore = create<SimState>()(
           }
           return {
             params,
-            bubbles: reconcileBubbles(state.bubbles, params, state.boundary),
+            bubbles: reconcileBubbles(state.bubbles, params, state.params, state.boundary),
             axes: reconcileAxes(state.axes, params, state.params, state.boundary)
           };
         }),

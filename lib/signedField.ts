@@ -27,7 +27,7 @@ export function fieldValueAt(x: number, y: number, bubbles: Bubble[]) {
     if (bubble.kind === "mass") {
       value += r2 / (distance2 + r2 * 0.2);
     } else {
-      value -= (r2 * 1.55) / (distance2 + r2 * 0.28);
+      value -= r2 / (distance2 + r2 * 0.2);
     }
   }
 
