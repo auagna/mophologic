@@ -36,6 +36,10 @@ export function createDefaultParams(): SimParams {
     surfaceMode: "merge",
     bubbleFillColor: "#050505",
     axisFillColor: "#2f7fd2",
+    showGrid: true,
+    snapToGrid: false,
+    gridColumns: 6,
+    gridRows: 6,
     moduleColumns: 3,
     moduleRows: 2
   };

@@ -17,6 +17,7 @@ export type Axis = {
   y2: number;
   thickness: number;
   kind: "mass";
+  fixed?: boolean;
 };
 
 export type AxisNode = {
@@ -59,6 +60,10 @@ export type SimParams = {
   surfaceMode: "merge" | "separate";
   bubbleFillColor: string;
   axisFillColor: string;
+  showGrid: boolean;
+  snapToGrid: boolean;
+  gridColumns: number;
+  gridRows: number;
   moduleColumns: number;
   moduleRows: number;
 };

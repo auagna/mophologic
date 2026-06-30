@@ -42,6 +42,7 @@ export function ForceCanvas() {
   const axisFieldBubbles = useMemo(() => carveBubbles.map((bubble) => ({ ...bubble, vx: 0, vy: 0 })), [carveBubbles]);
   const links = useMemo(() => linksForBubbles(bubbles, params), [bubbles, params]);
   const axisNodes = useMemo(() => axisNodesForAxes(axes), [axes]);
+  const fixedAxisIds = useMemo(() => new Set(axes.filter((axis) => axis.fixed).map((axis) => axis.id)), [axes]);
   const fieldPath = useMemo(() => buildSignedFieldPath(bubbles, axes, boundary, params), [bubbles, axes, boundary, params]);
   const bubbleFieldPath = useMemo(() => buildSignedFieldPath(bubbles, [], boundary, params), [bubbles, boundary, params]);
   const axisFieldPath = useMemo(() => buildSignedFieldPath(axisFieldBubbles, axes, boundary, params), [axisFieldBubbles, axes, boundary, params]);
@@ -153,6 +154,7 @@ export function ForceCanvas() {
 
           <rect width={VIEWBOX.width} height={VIEWBOX.height} fill="#f2efe5" />
           <rect width={VIEWBOX.width} height={VIEWBOX.height} fill="url(#force-grid)" opacity="0.38" />
+          {params.showGrid ? <DesignGrid boundary={boundary} columns={params.gridColumns} rows={params.gridRows} /> : null}
           <path d={bPath} fill="none" stroke="#776f63" strokeDasharray="7 7" strokeWidth="2" />
 
           {visual.showLinks || patternMode === "network" ? (
@@ -167,6 +169,7 @@ export function ForceCanvas() {
                     stroke={selectedId === axis.id ? "#ffffff" : "#4e9dff"}
                     strokeLinecap="round"
                     strokeWidth={Math.max(2, axis.thickness * 0.08)}
+                    strokeDasharray={axis.fixed ? "7 5" : undefined}
                     opacity="0.42"
                   />
                 </g>
@@ -234,6 +237,7 @@ export function ForceCanvas() {
                     stroke={selectedId === axis.id ? "#ffffff" : "#4e9dff"}
                     strokeLinecap="round"
                     strokeWidth={Math.max(2, axis.thickness * 0.1)}
+                    strokeDasharray={axis.fixed ? "7 5" : undefined}
                     opacity="0.62"
                     pointerEvents="none"
                   />
@@ -246,12 +250,17 @@ export function ForceCanvas() {
                     strokeLinecap="round"
                     strokeWidth={Math.max(8, axis.thickness * 0.24)}
                     pointerEvents="stroke"
-                    className="cursor-grab active:cursor-grabbing"
+                    className={axis.fixed ? "cursor-default" : "cursor-grab active:cursor-grabbing"}
                     onPointerDown={(event) => {
                       const point = pointFromEvent(event);
                       if (!point) return;
                       event.stopPropagation();
                       selectAxisNode(axis.id);
+                      if (event.shiftKey) {
+                        toggleFixed(axis.id);
+                        return;
+                      }
+                      if (axis.fixed) return;
                       dragTarget.current = { type: "axis", axisId: axis.id, lastX: point.x, lastY: point.y };
                       event.currentTarget.setPointerCapture(event.pointerId);
                     }}
@@ -275,6 +284,7 @@ export function ForceCanvas() {
                       toggleFixed(bubble.id);
                       return;
                     }
+                    if (bubble.fixed) return;
                     dragTarget.current = { type: "bubble", id: bubble.id };
                     event.currentTarget.setPointerCapture(event.pointerId);
                   }}
@@ -297,6 +307,7 @@ export function ForceCanvas() {
                       toggleFixed(bubble.id);
                       return;
                     }
+                    if (bubble.fixed) return;
                     dragTarget.current = { type: "bubble", id: bubble.id };
                     event.currentTarget.setPointerCapture(event.pointerId);
                   }}
@@ -317,6 +328,7 @@ export function ForceCanvas() {
                     toggleFixed(bubble.id);
                     return;
                   }
+                  if (bubble.fixed) return;
                   dragTarget.current = { type: "bubble", id: bubble.id };
                   event.currentTarget.setPointerCapture(event.pointerId);
                 }}
@@ -331,9 +343,15 @@ export function ForceCanvas() {
                   key={node.id}
                   node={node}
                   selected={node.id === selectedId}
+                  fixed={fixedAxisIds.has(node.axisId)}
                   onPointerDown={(event) => {
                     event.stopPropagation();
                     selectAxisNode(node.id);
+                    if (event.shiftKey) {
+                      toggleFixed(node.axisId);
+                      return;
+                    }
+                    if (fixedAxisIds.has(node.axisId)) return;
                     dragTarget.current = { type: "axis-node", axisId: node.axisId, role: node.role };
                     event.currentTarget.setPointerCapture(event.pointerId);
                   }}
@@ -342,10 +360,37 @@ export function ForceCanvas() {
             </g>
           ) : null}
 
-          {isPaused ? <text x={24} y={VIEWBOX.height - 24} fill="#776f63" fontSize="14">paused</text> : null}
+          {isPaused ? (
+            <text x={24} y={VIEWBOX.height - 24} fill="#776f63" fontSize="14">
+              motion stopped
+            </text>
+          ) : null}
         </svg>
       </div>
     </section>
+  );
+}
+
+function DesignGrid({ boundary, columns, rows }: { boundary: { cx: number; cy: number; width: number; height: number; padding: number }; columns: number; rows: number }) {
+  const safeColumns = Math.max(1, columns);
+  const safeRows = Math.max(1, rows);
+  const width = Math.max(1, boundary.width - boundary.padding * 2);
+  const height = Math.max(1, boundary.height - boundary.padding * 2);
+  const left = boundary.cx - width / 2;
+  const top = boundary.cy - height / 2;
+  const verticals = Array.from({ length: safeColumns + 1 }, (_, index) => left + (width * index) / safeColumns);
+  const horizontals = Array.from({ length: safeRows + 1 }, (_, index) => top + (height * index) / safeRows);
+
+  return (
+    <g data-design-grid pointerEvents="none">
+      <rect x={left} y={top} width={width} height={height} fill="none" stroke="#9b9386" strokeWidth="1" opacity="0.28" />
+      {verticals.map((x, index) => (
+        <line key={`v-${index}`} x1={x} y1={top} x2={x} y2={top + height} stroke="#9b9386" strokeWidth="0.9" opacity={index === 0 || index === safeColumns ? 0.32 : 0.22} />
+      ))}
+      {horizontals.map((y, index) => (
+        <line key={`h-${index}`} x1={left} y1={y} x2={left + width} y2={y} stroke="#9b9386" strokeWidth="0.9" opacity={index === 0 || index === safeRows ? 0.32 : 0.22} />
+      ))}
+    </g>
   );
 }
 
@@ -358,7 +403,7 @@ function BubbleHandle({ bubble, onPointerDown }: { bubble: Bubble; onPointerDown
       r={bubble.r}
       fill="transparent"
       pointerEvents="all"
-      className="cursor-grab active:cursor-grabbing"
+      className={bubble.fixed ? "cursor-default" : "cursor-grab active:cursor-grabbing"}
       onPointerDown={onPointerDown}
     />
   );
@@ -367,10 +412,12 @@ function BubbleHandle({ bubble, onPointerDown }: { bubble: Bubble; onPointerDown
 function AxisNodeGuide({
   node,
   selected,
+  fixed,
   onPointerDown
 }: {
   node: AxisNode;
   selected: boolean;
+  fixed?: boolean;
   onPointerDown: (event: PointerEvent<SVGCircleElement>) => void;
 }) {
   return (
@@ -381,7 +428,7 @@ function AxisNodeGuide({
         r={Math.max(14, node.r * 0.7)}
         fill="transparent"
         pointerEvents="all"
-        className="cursor-grab active:cursor-grabbing"
+        className={fixed ? "cursor-default" : "cursor-grab active:cursor-grabbing"}
         onPointerDown={onPointerDown}
       />
       <circle
@@ -390,13 +437,13 @@ function AxisNodeGuide({
         r={node.r}
         fill="rgba(78,157,255,0.08)"
         stroke={selected ? "#ffffff" : "#4e9dff"}
-        strokeDasharray="5 4"
+        strokeDasharray={fixed ? "2 5" : "5 4"}
         strokeWidth={selected ? 3 : 1.7}
         pointerEvents="all"
-        className="cursor-grab active:cursor-grabbing"
+        className={fixed ? "cursor-default" : "cursor-grab active:cursor-grabbing"}
         onPointerDown={onPointerDown}
       />
-      <text x={node.x} y={node.y + 5} fill="#4e9dff" fontSize={node.r * 0.42} textAnchor="middle" pointerEvents="none" opacity="0.72">
+      <text x={node.x} y={node.y + 5} fill="#4e9dff" fontSize={node.r * 0.42} textAnchor="middle" pointerEvents="none" opacity={fixed ? 0.42 : 0.72}>
         +
       </text>
     </g>
@@ -424,7 +471,7 @@ function BubbleCircle({
         stroke={selected ? "#ffffff" : isCarve ? "#f2efe5" : bubble.fixed ? "#2f7fd2" : "#4e9dff"}
         strokeDasharray={bubble.fixed ? "6 4" : undefined}
         strokeWidth={selected ? 3 : 1.6}
-        className="cursor-grab active:cursor-grabbing"
+        className={bubble.fixed ? "cursor-default" : "cursor-grab active:cursor-grabbing"}
         onPointerDown={onPointerDown}
       />
       <text

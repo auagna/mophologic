@@ -1,6 +1,6 @@
 "use client";
 
-import { Pause, Play, RefreshCw, Shuffle, Trash2 } from "lucide-react";
+import { Grid3X3, Lock, Magnet, Pause, Play, RefreshCw, Shuffle, Trash2, Unlock } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Slider } from "@/components/ui/Slider";
@@ -37,6 +37,8 @@ const surfaceOptions: Array<{ value: SimParams["surfaceMode"]; label: string }> 
 export function ControlPanel() {
   const boundary = useSimStore((state) => state.boundary);
   const params = useSimStore((state) => state.params);
+  const bubbles = useSimStore((state) => state.bubbles);
+  const axes = useSimStore((state) => state.axes);
   const isPaused = useSimStore((state) => state.isPaused);
   const selectedId = useSimStore((state) => state.selectedId);
   const patternMode = useSimStore((state) => state.patternMode);
@@ -48,8 +50,13 @@ export function ControlPanel() {
   const resetSimulation = useSimStore((state) => state.resetSimulation);
   const setPaused = useSimStore((state) => state.setPaused);
   const deleteSelected = useSimStore((state) => state.deleteSelected);
+  const toggleSelectedFixed = useSimStore((state) => state.toggleSelectedFixed);
+  const snapAllToGrid = useSimStore((state) => state.snapAllToGrid);
   const setPatternMode = useSimStore((state) => state.setPatternMode);
   const toggleVisual = useSimStore((state) => state.toggleVisual);
+  const selectedBubble = bubbles.find((bubble) => bubble.id === selectedId);
+  const selectedAxis = axes.find((axis) => selectedId === axis.id || selectedId === `${axis.id}-start` || selectedId === `${axis.id}-end`);
+  const selectedLocked = Boolean(selectedBubble?.fixed ?? selectedAxis?.fixed);
 
   return (
     <aside className="lab-scrollbar max-h-[calc(100vh-5rem)] overflow-auto border border-lab-border bg-lab-panel shadow-panel">
@@ -59,7 +66,7 @@ export function ControlPanel() {
           <div className="grid grid-cols-2 gap-2">
             <Button variant="primary" onClick={() => setPaused(!isPaused)}>
               {isPaused ? <Play size={14} /> : <Pause size={14} />}
-              {isPaused ? "Play" : "Pause"}
+              {isPaused ? "Motion" : "Stop"}
             </Button>
             <Button onClick={resetSimulation}>
               <RefreshCw size={14} />
@@ -68,6 +75,10 @@ export function ControlPanel() {
             <Button onClick={randomizeSeed}>
               <Shuffle size={14} />
               Randomize
+            </Button>
+            <Button onClick={toggleSelectedFixed} disabled={!selectedId}>
+              {selectedLocked ? <Unlock size={14} /> : <Lock size={14} />}
+              {selectedLocked ? "Unlock" : "Lock"}
             </Button>
             <Button variant="danger" onClick={deleteSelected} disabled={!selectedId}>
               <Trash2 size={14} />
@@ -84,6 +95,28 @@ export function ControlPanel() {
             />
           </label>
           <SegmentedControl value={params.generationMode} options={generationOptions} onChange={(value) => updateParam("generationMode", value)} className="grid-cols-3" />
+        </section>
+
+        <section className="grid gap-3">
+          <PanelTitle>Grid</PanelTitle>
+          <div className="grid grid-cols-2 gap-2">
+            <NumberControl label="Columns" value={params.gridColumns} min={1} max={24} onChange={(value) => updateParam("gridColumns", value)} />
+            <NumberControl label="Rows" value={params.gridRows} min={1} max={24} onChange={(value) => updateParam("gridRows", value)} />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Button active={params.showGrid} onClick={() => updateParam("showGrid", !params.showGrid)}>
+              <Grid3X3 size={14} />
+              Grid
+            </Button>
+            <Button active={params.snapToGrid} onClick={() => updateParam("snapToGrid", !params.snapToGrid)}>
+              <Magnet size={14} />
+              Snap Drag
+            </Button>
+          </div>
+          <Button onClick={snapAllToGrid}>
+            <Magnet size={14} />
+            Align To Grid
+          </Button>
         </section>
 
         <section className="grid gap-3">
@@ -185,6 +218,22 @@ function ColorControl({ label, value, disabled, onChange }: { label: string; val
         />
         <span className="min-w-0 flex-1 truncate text-[10px] uppercase tabular-nums text-lab-text">{value}</span>
       </span>
+    </label>
+  );
+}
+
+function NumberControl({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (value: number) => void }) {
+  return (
+    <label className="grid gap-1.5 text-[11px] text-lab-muted">
+      {label}
+      <input
+        type="number"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(event) => onChange(Math.min(max, Math.max(min, Number(event.target.value))))}
+        className="h-8 border border-lab-border bg-[#0b0d10] px-2 text-[12px] tabular-nums text-lab-text outline-none focus:border-lab-blue"
+      />
     </label>
   );
 }

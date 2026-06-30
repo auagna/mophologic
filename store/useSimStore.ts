@@ -37,6 +37,8 @@ type SimState = {
   moveAxisNode: (axisId: string, role: "start" | "end", x: number, y: number) => void;
   translateAxis: (axisId: string, dx: number, dy: number) => void;
   toggleFixed: (id: string) => void;
+  toggleSelectedFixed: () => void;
+  snapAllToGrid: () => void;
   addBubble: (kind: Bubble["kind"], x: number, y: number) => void;
   deleteSelected: () => void;
 };
@@ -67,6 +69,10 @@ function normalizeParams(params: SimParams): SimParams {
     surfaceMode: params.surfaceMode === "separate" ? "separate" : "merge",
     bubbleFillColor: normalizeColor(params.bubbleFillColor, initialParams.bubbleFillColor),
     axisFillColor: normalizeColor(params.axisFillColor, initialParams.axisFillColor),
+    showGrid: params.showGrid ?? initialParams.showGrid,
+    snapToGrid: params.snapToGrid ?? initialParams.snapToGrid,
+    gridColumns: clampInteger(params.gridColumns, 1, 24, initialParams.gridColumns),
+    gridRows: clampInteger(params.gridRows, 1, 24, initialParams.gridRows),
     moduleColumns: clampInteger(params.moduleColumns, 1, 8, initialParams.moduleColumns),
     moduleRows: clampInteger(params.moduleRows, 1, 6, initialParams.moduleRows)
   };
@@ -157,6 +163,39 @@ function safeRatio(next: number, previous: number) {
   return next / previous;
 }
 
+function axisIdFromSelection(id: string | null, axes: Axis[]) {
+  if (!id) return null;
+  if (axes.some((axis) => axis.id === id)) return id;
+  return axes.find((axis) => id === `${axis.id}-start` || id === `${axis.id}-end`)?.id ?? null;
+}
+
+function gridFrame(boundary: Boundary) {
+  const width = Math.max(1, boundary.width - boundary.padding * 2);
+  const height = Math.max(1, boundary.height - boundary.padding * 2);
+  return {
+    left: boundary.cx - width / 2,
+    top: boundary.cy - height / 2,
+    width,
+    height
+  };
+}
+
+function snapPointToGrid(x: number, y: number, params: SimParams, boundary: Boundary) {
+  const frame = gridFrame(boundary);
+  const columns = Math.max(1, params.gridColumns);
+  const rows = Math.max(1, params.gridRows);
+  const cellW = frame.width / columns;
+  const cellH = frame.height / rows;
+  return {
+    x: frame.left + Math.round((x - frame.left) / cellW) * cellW,
+    y: frame.top + Math.round((y - frame.top) / cellH) * cellH
+  };
+}
+
+function maybeSnapPoint(x: number, y: number, params: SimParams, boundary: Boundary) {
+  return params.snapToGrid ? snapPointToGrid(x, y, params, boundary) : { x, y };
+}
+
 export const useSimStore = create<SimState>()(
   persist(
     (set) => ({
@@ -232,19 +271,23 @@ export const useSimStore = create<SimState>()(
         set((state) => ({
           bubbles: state.bubbles.map((bubble) => {
             if (bubble.id !== id) return bubble;
-            return clampBubbleToBoundary({ ...bubble, x, y, vx: 0, vy: 0 }, state.boundary);
+            if (bubble.fixed) return { ...bubble, vx: 0, vy: 0 };
+            const point = maybeSnapPoint(x, y, state.params, state.boundary);
+            return clampBubbleToBoundary({ ...bubble, x: point.x, y: point.y, vx: 0, vy: 0 }, state.boundary);
           })
         })),
       moveAxisNode: (axisId, role, x, y) =>
         set((state) => ({
           axes: state.axes.map((axis) => {
             if (axis.id !== axisId) return axis;
+            if (axis.fixed) return axis;
+            const point = maybeSnapPoint(x, y, state.params, state.boundary);
             const r = axis.thickness / 2;
             const clamped = clampBubbleToBoundary(
               {
                 id: `${axis.id}-${role}`,
-                x,
-                y,
+                x: point.x,
+                y: point.y,
                 vx: 0,
                 vy: 0,
                 r,
@@ -259,24 +302,69 @@ export const useSimStore = create<SimState>()(
         set((state) => ({
           axes: state.axes.map((axis) => {
             if (axis.id !== axisId) return axis;
+            if (axis.fixed) return axis;
             const r = axis.thickness / 2;
-            const start = clampBubbleToBoundary({ id: `${axis.id}-start`, x: axis.x1 + dx, y: axis.y1 + dy, vx: 0, vy: 0, r, kind: "mass" }, state.boundary);
-            const end = clampBubbleToBoundary({ id: `${axis.id}-end`, x: axis.x2 + dx, y: axis.y2 + dy, vx: 0, vy: 0, r, kind: "mass" }, state.boundary);
+            let x1 = axis.x1 + dx;
+            let y1 = axis.y1 + dy;
+            let x2 = axis.x2 + dx;
+            let y2 = axis.y2 + dy;
+            if (state.params.snapToGrid) {
+              const center = snapPointToGrid((x1 + x2) / 2, (y1 + y2) / 2, state.params, state.boundary);
+              const currentCenterX = (x1 + x2) / 2;
+              const currentCenterY = (y1 + y2) / 2;
+              x1 += center.x - currentCenterX;
+              y1 += center.y - currentCenterY;
+              x2 += center.x - currentCenterX;
+              y2 += center.y - currentCenterY;
+            }
+            const start = clampBubbleToBoundary({ id: `${axis.id}-start`, x: x1, y: y1, vx: 0, vy: 0, r, kind: "mass" }, state.boundary);
+            const end = clampBubbleToBoundary({ id: `${axis.id}-end`, x: x2, y: y2, vx: 0, vy: 0, r, kind: "mass" }, state.boundary);
             return { ...axis, x1: start.x, y1: start.y, x2: end.x, y2: end.y };
           })
         })),
       toggleFixed: (id) =>
+        set((state) => {
+          const axisId = axisIdFromSelection(id, state.axes);
+          return {
+            bubbles: state.bubbles.map((bubble) => (bubble.id === id ? { ...bubble, fixed: !bubble.fixed, vx: 0, vy: 0 } : bubble)),
+            axes: state.axes.map((axis) => (axis.id === axisId ? { ...axis, fixed: !axis.fixed } : axis))
+          };
+        }),
+      toggleSelectedFixed: () =>
+        set((state) => {
+          if (!state.selectedId) return state;
+          const axisId = axisIdFromSelection(state.selectedId, state.axes);
+          return {
+            bubbles: state.bubbles.map((bubble) => (bubble.id === state.selectedId ? { ...bubble, fixed: !bubble.fixed, vx: 0, vy: 0 } : bubble)),
+            axes: state.axes.map((axis) => (axis.id === axisId ? { ...axis, fixed: !axis.fixed } : axis))
+          };
+        }),
+      snapAllToGrid: () =>
         set((state) => ({
-          bubbles: state.bubbles.map((bubble) => (bubble.id === id ? { ...bubble, fixed: !bubble.fixed, vx: 0, vy: 0 } : bubble))
+          bubbles: state.bubbles.map((bubble) => {
+            if (bubble.fixed) return { ...bubble, vx: 0, vy: 0 };
+            const point = snapPointToGrid(bubble.x, bubble.y, state.params, state.boundary);
+            return clampBubbleToBoundary({ ...bubble, x: point.x, y: point.y, vx: 0, vy: 0 }, state.boundary);
+          }),
+          axes: state.axes.map((axis) => {
+            if (axis.fixed) return axis;
+            const r = axis.thickness / 2;
+            const startPoint = snapPointToGrid(axis.x1, axis.y1, state.params, state.boundary);
+            const endPoint = snapPointToGrid(axis.x2, axis.y2, state.params, state.boundary);
+            const start = clampBubbleToBoundary({ id: `${axis.id}-start`, x: startPoint.x, y: startPoint.y, vx: 0, vy: 0, r, kind: "mass" }, state.boundary);
+            const end = clampBubbleToBoundary({ id: `${axis.id}-end`, x: endPoint.x, y: endPoint.y, vx: 0, vy: 0, r, kind: "mass" }, state.boundary);
+            return { ...axis, x1: start.x, y1: start.y, x2: end.x, y2: end.y };
+          })
         })),
       addBubble: (kind, x, y) =>
         set((state) => {
           const r = kind === "mass" ? (state.params.minRadius + state.params.maxRadius) / 2 : (state.params.carveMinRadius + state.params.carveMaxRadius) / 2;
-          if (!isInsideBoundary(x, y, r, state.boundary)) return state;
+          const point = maybeSnapPoint(x, y, state.params, state.boundary);
+          if (!isInsideBoundary(point.x, point.y, r, state.boundary)) return state;
           const bubble: Bubble = {
             id: `${kind}-${Date.now()}-${Math.round(x)}-${Math.round(y)}`,
-            x,
-            y,
+            x: point.x,
+            y: point.y,
             vx: 0,
             vy: 0,
             r,
